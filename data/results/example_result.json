@@ -1,0 +1,11 @@
+{
+  "_note": "Example/dummy result for schema illustration only — not a real experiment run.",
+  "tokenizer": "bpe_custom_v1",
+  "dataset": "en",
+  "vocab_size": 500,
+  "num_tokens": 128,
+  "compression_ratio": 3.42,
+  "encode_time_ms": 1.23,
+  "decode_time_ms": 0.87,
+  "timestamp": "2026-09-02T00:00:00Z"
+}

@@ -1,0 +1,18 @@
+[project]
+name = "llm-tokenization-lab"
+version = "0.1.0"
+description = "Educational platform implementing LLM tokenization algorithms (BPE, WordPiece) from scratch, with a benchmarking dashboard to compare them against production tokenizers."
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
