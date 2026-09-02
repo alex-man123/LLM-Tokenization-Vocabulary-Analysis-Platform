@@ -10,11 +10,13 @@ from tokenizers.base import Tokenizer
 from tokenizers.bpe.tokenizer import BPETokenizer
 from tokenizers.character_tokenizer import CharacterTokenizer
 from tokenizers.word_tokenizer import WordTokenizer
+from tokenizers.wordpiece.tokenizer import WordPieceTokenizer
 
 AVAILABLE_TOKENIZERS: dict[str, type[Tokenizer]] = {
     "character": CharacterTokenizer,
     "word": WordTokenizer,
     "bpe": BPETokenizer,
+    "wordpiece": WordPieceTokenizer,
 }
 
 

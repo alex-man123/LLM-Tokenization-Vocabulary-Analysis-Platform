@@ -56,8 +56,8 @@ whether a token or ID is one of the special ones. Tokenizers must import the
 `PAD`/`UNK`/`BOS`/`EOS` constants (or use `SpecialTokens`) instead of
 hardcoding these strings or IDs themselves.
 
-WordPiece does not exist in this repo yet — it will register its tokens
-into `Vocabulary`/`SpecialTokens` the same way once implemented.
+`WordPieceTokenizer` registers its tokens into `Vocabulary`/`SpecialTokens`
+the same way as every other tokenizer — see the dedicated section below.
 
 ### Generalized tokenizer serialization (`src/vocabulary/serialization.py`, Task 4.4)
 
@@ -82,21 +82,24 @@ writes its own ad hoc JSON. The file format:
   reassigns the same IDs, since `add_token` assigns IDs in iteration order).
 - `config` holds whatever is specific to that tokenizer type; only
   `BPETokenizer` currently uses it, for its ordered `merges` list.
-  Character/word tokenizers save `config: {}`.
+  Character/word/WordPiece tokenizers save `config: {}` — WordPiece needs
+  no merge-rule list, since its encode is greedy longest-match against the
+  vocabulary (see the WordPiece section below).
 - `tokenizer_type` must match the loading tokenizer's `name` — `load`
   raises `ValueError` rather than silently loading a mismatched vocabulary
   (e.g. a `"word"` file into a `CharacterTokenizer`).
 - `version`/`trained_at` are metadata for traceability, not currently used
   to change loading behavior.
 
-## Character, Word & BPE tokenizers (`src/tokenizers/`)
+## Character, Word, BPE & WordPiece tokenizers (`src/tokenizers/`)
 
-`CharacterTokenizer`, `WordTokenizer`, and `BPETokenizer` are the concrete
-implementations of the `Tokenizer` contract (Task 0.2) built so far. All
-three use the shared `Vocabulary`/`SpecialTokens` for every token<->ID
-mapping — none keeps a mapping of its own. `tokenize()` returns string
-tokens; `encode()` returns the IDs for those tokens (looked up through
-`Vocabulary`), with an unknown token mapped to `<UNK>` instead of raising.
+`CharacterTokenizer`, `WordTokenizer`, `BPETokenizer`, and
+`WordPieceTokenizer` are the concrete implementations of the `Tokenizer`
+contract (Task 0.2) built so far. All four use the shared
+`Vocabulary`/`SpecialTokens` for every token<->ID mapping — none keeps a
+mapping of its own. `tokenize()` returns string tokens; `encode()` returns
+the IDs for those tokens (looked up through `Vocabulary`), with an unknown
+token mapped to `<UNK>` instead of raising.
 
 - **`CharacterTokenizer`**: `tokenize(text)` is `list(text)` — every
   character (including spaces/newlines, and any Unicode character) is its
@@ -176,6 +179,51 @@ whitespace in the input collapses to a single space in the output.
 
 **Serialization**: uses the generalized `TokenizerState` (Task 4.4, above);
 its `config` holds `{"merges": [[a, b], ...]}`.
+
+### WordPiece tokenizer (`src/tokenizers/wordpiece/`)
+
+> **Disclaimer:** see `docs/wordpiece_explained.md` for the full writeup
+> and disclaimer. In short: the merge score implemented here is a
+> **simplified WordPiece training implementation inspired by the original
+> WordPiece objective** (Schuster & Nakajima, 2012), not a reproduction of
+> the training procedure BERT/Hugging Face's `tokenizers` library use.
+
+**Representation** (`src/tokenizers/wordpiece/trainer.py`): the corpus is
+split into words by reusing `WordTokenizer.tokenize` (Task 1.2) — WordPiece
+does not re-implement word/punctuation splitting. Each word becomes a tuple
+of symbols: its first character unprefixed, every other character prefixed
+with `##` to mark it as a continuation, e.g. `"hello"` ->
+`("h", "##e", "##l", "##l", "##o")`. This is the opposite convention from
+BPE's trailing `</w>`: WordPiece marks the *continuation* of a word, BPE
+marks its *end*.
+
+**Merge score**: instead of BPE's raw pair frequency, each candidate pair
+is scored `freq(a, b) / (freq(a) * freq(b))` (`score_pairs`) — a pair
+scores highest when it co-occurs often *relative to* its components'
+individual frequencies, not simply when it is the most frequent pair in
+absolute terms. The same lexicographic tie-break as BPE
+(`select_best_pair`) keeps training deterministic on small corpora.
+
+**Training loop** (`train_wordpiece`): repeatedly merges the
+highest-scoring pair until a target `vocab_size` is reached or no candidate
+pair remains. Unlike BPE, **no ordered merge-rule list is recorded** — only
+the final vocabulary is kept, because WordPiece encode does not replay
+merges in order.
+
+**Encode**: `tokenize`/`encode` use greedy longest-match-first
+(`_greedy_longest_match` in `tokenizers/wordpiece/tokenizer.py`): for each
+word, the longest available vocabulary entry is matched at each position
+(continuation pieces tried with the `##` prefix), left to right. If any
+position has no match, the *whole word* becomes a single `<UNK>` token — a
+partial tokenization is never returned, the standard WordPiece/BERT
+behaviour.
+
+**Decode**: tokens are concatenated, stripping `##` from continuation
+pieces so they reattach without a space, and distinct words are joined
+with a single space — the inverse of the encode convention above.
+
+**Serialization**: uses the generalized `TokenizerState` (Task 4.4, above)
+with `config: {}` — no merge-rule list is needed (see "Training loop").
 
 ## Experiment result schema (JSON)
 
@@ -270,6 +318,35 @@ ratio alone — a larger vocabulary tends to produce fewer, longer tokens.
 Any consumer of this DataFrame (the Streamlit Compare page included) must
 show `vocab_size` alongside the other metrics, not report them in
 isolation.
+
+## Token frequency analysis (`src/vocabulary/frequency_analysis.py`, Task 4.3)
+
+Feeds the planned "Vocabulary" UI page: how often each token a trained
+tokenizer actually produces occurs across a training corpus, which tokens
+are rare, and which dominate. Mirrors `benchmarking.metrics`'s "pure
+function + dataclass" pattern — no Streamlit dependency.
+
+- `compute_token_frequencies(tokenizer, corpus) -> dict[str, int]` — counts
+  tokens from `tokenizer.tokenize(text)` for each document, **not**
+  substring occurrences of a token's text in the raw corpus (two different
+  pieces of text can look alike but tokenize differently). No special
+  tokens are filtered out; if `tokenize` produces one (e.g. `<UNK>`), it is
+  counted like any other token.
+- `top_n_frequent_tokens(frequencies, n) -> list[TokenFrequency]` — the `n`
+  most frequent tokens, highest first, ties broken lexicographically by
+  token for determinism. `n <= 0` returns `[]`.
+- `rare_tokens(frequencies, threshold) -> list[TokenFrequency]` — every
+  token with `frequency < threshold`, ordered by frequency then token.
+  `threshold <= 0` returns `[]` (frequencies are always >= 1).
+- `to_dataframe(entries) -> pandas.DataFrame` — a `token`/`frequency` table
+  ready to display or export, for either of the two functions above.
+
+**Zipfian distribution**: natural-language token frequencies are
+approximately Zipfian — a handful of tokens (common words, frequent
+subwords) account for most occurrences, while most of a vocabulary's
+entries appear rarely, a long tail. This is why growing a vocabulary size
+has diminishing returns: most of the added capacity goes to rarely-used
+tokens, not to better covering the common case.
 
 ## Streamlit UI (`ui/`, Phase 8)
 

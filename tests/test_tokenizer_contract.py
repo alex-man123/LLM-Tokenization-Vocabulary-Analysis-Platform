@@ -6,8 +6,9 @@ from tokenizers.base import Tokenizer
 from tokenizers.bpe.tokenizer import BPETokenizer
 from tokenizers.character_tokenizer import CharacterTokenizer
 from tokenizers.word_tokenizer import WordTokenizer
+from tokenizers.wordpiece.tokenizer import WordPieceTokenizer
 
-TOKENIZER_CLASSES = [CharacterTokenizer, WordTokenizer, BPETokenizer]
+TOKENIZER_CLASSES = [CharacterTokenizer, WordTokenizer, BPETokenizer, WordPieceTokenizer]
 
 
 @pytest.mark.parametrize("tokenizer_cls", TOKENIZER_CLASSES)

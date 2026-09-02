@@ -7,10 +7,11 @@ import pytest
 from tokenizers.bpe.tokenizer import BPETokenizer
 from tokenizers.character_tokenizer import CharacterTokenizer
 from tokenizers.word_tokenizer import WordTokenizer
+from tokenizers.wordpiece.tokenizer import WordPieceTokenizer
 from vocabulary.serialization import vocabulary_tokens_in_order
 from vocabulary.vocab import Vocabulary
 
-TOKENIZER_CLASSES = [CharacterTokenizer, WordTokenizer, BPETokenizer]
+TOKENIZER_CLASSES = [CharacterTokenizer, WordTokenizer, BPETokenizer, WordPieceTokenizer]
 
 
 @pytest.mark.parametrize("tokenizer_cls", TOKENIZER_CLASSES)

@@ -25,7 +25,7 @@ def test_tokenize_page_runs_with_default_input():
     at.run(timeout=15)
 
     assert not at.exception
-    assert sorted(at.selectbox[0].options) == ["bpe", "character", "word"]
+    assert sorted(at.selectbox[0].options) == ["bpe", "character", "word", "wordpiece"]
     assert len(at.dataframe) == 1
     assert set(at.dataframe[0].value.columns) == {"token", "token_id"}
 
@@ -54,7 +54,7 @@ def test_compare_page_runs_with_default_selection():
     at.run(timeout=15)
 
     assert not at.exception
-    assert sorted(at.multiselect[0].value) == ["bpe", "character", "word"]
+    assert sorted(at.multiselect[0].value) == ["bpe", "character", "word", "wordpiece"]
     assert len(at.dataframe) == 1
 
     df = at.dataframe[0].value
@@ -69,7 +69,7 @@ def test_compare_page_runs_with_default_selection():
         "decoding_time",
     }
     assert required_columns <= set(df.columns)
-    assert len(df) == 3
+    assert len(df) == 4
     assert (df["vocab_size"] > 0).all()
 
 
