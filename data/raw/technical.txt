@@ -1,0 +1,50 @@
+A typical web application exposes its functionality through a REST API,
+where clients send HTTP requests (GET, POST, PUT, DELETE) to specific
+endpoints and receive responses encoded as JSON. Authentication is often
+handled via an API key or a short-lived OAuth 2.0 access token passed in
+the Authorization header, and rate limiting protects the backend from
+being overwhelmed by too many requests per second.
+
+Behind the API, a typical software architecture separates concerns into
+distinct layers: a presentation layer (the UI or API surface), a business
+logic layer (services, use cases, domain models), and a persistence layer
+backed by a relational database such as PostgreSQL or a document store
+such as MongoDB. Caching layers, often built on Redis, sit between the
+application and the database to reduce latency for frequently accessed
+data.
+
+Machine learning systems add another set of concerns on top of this.
+A model is trained offline on a large dataset, then serialized and
+deployed behind an inference endpoint. For natural language processing
+specifically, the pipeline usually starts with tokenization: raw text is
+split into tokens, each token is mapped to an integer ID via a
+vocabulary, and the sequence of IDs is passed through an embedding layer
+that converts them into dense vectors. Those vectors then flow through
+the model's transformer layers, which use self-attention to let every
+token in a sequence attend to every other token, before a final layer
+produces a probability distribution over the vocabulary for the next
+token.
+
+Training a tokenizer's vocabulary is itself a small machine learning
+problem. Byte Pair Encoding and WordPiece both start from a base alphabet
+(characters or bytes) and iteratively merge symbol pairs according to a
+scoring function, until a target vocabulary size is reached. The
+resulting vocabulary is serialized — often as a JSON file containing the
+token list and merge rules — so it can be loaded again at inference time
+without retraining.
+
+Observability is critical once a system is in production. Structured
+logging, distributed tracing (e.g. via OpenTelemetry), and metrics
+dashboards (e.g. via Prometheus and Grafana) let engineers diagnose
+latency spikes, error rate increases, or unexpected changes in a model's
+output distribution. A/B testing infrastructure allows a new model
+version or a new tokenizer configuration to be rolled out to a small
+percentage of traffic before a full deployment, with automated rollback
+if key metrics regress.
+
+Version control, continuous integration, and continuous deployment
+(CI/CD) pipelines tie all of this together: every commit triggers an
+automated test suite, a linter (such as ruff for Python), and, if all
+checks pass, a deployment pipeline that packages the application (often
+as a Docker container) and ships it to a staging or production
+environment, frequently orchestrated by Kubernetes.

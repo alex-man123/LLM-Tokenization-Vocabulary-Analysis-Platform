@@ -1,0 +1,54 @@
+Tokenization is the first step in almost every natural language processing
+pipeline, yet it is often the least discussed part of how large language
+models actually work. Before a model can predict the next word in a
+sentence, the raw text has to be broken down into smaller units called
+tokens, and each token has to be mapped to an integer that the model's
+embedding table understands. The choices made at this stage ripple through
+everything downstream: how many tokens a sentence needs, how well the
+model generalizes to rare words, and even how fairly the model treats
+different languages.
+
+Early tokenizers were simple. A whitespace tokenizer just splits text on
+spaces, treating punctuation as part of whatever word it happens to
+touch. A character-level tokenizer goes to the other extreme, treating
+every single character as its own token, which guarantees there is never
+an unknown symbol but also means sentences turn into very long sequences
+of tokens. Neither approach scales well to a vocabulary of hundreds of
+thousands of words, and neither one handles a word the tokenizer has
+never seen before in a satisfying way.
+
+Subword tokenization was designed to sit between these two extremes. Byte
+Pair Encoding starts from individual characters and repeatedly merges the
+most frequent adjacent pair of symbols, building up a vocabulary of
+common word pieces without ever needing a fixed dictionary of whole
+words. A word like "unbelievable" might end up split into pieces such as
+"un", "believ", and "able" if those pieces were frequent enough during
+training, letting the tokenizer reconstruct rare or unseen words out of
+familiar fragments rather than falling back to a single unknown token.
+
+WordPiece, used by BERT and its many descendants, follows a similar idea
+but changes the criterion for choosing which pair to merge next. Instead
+of picking the single most frequent pair, it favors pairs that are
+frequent relative to how often their individual pieces occur on their
+own, which tends to avoid merging extremely common but uninformative
+combinations. The practical effect is a different, though often similar
+looking, vocabulary than plain frequency-based BPE would produce on the
+same corpus.
+
+Modern production tokenizers, such as the byte-level BPE used by GPT-style
+models, add one more twist: instead of operating on Unicode characters,
+they operate directly on the underlying bytes of the UTF-8 encoding. This
+means there are only two hundred fifty six possible base symbols, so the
+tokenizer never encounters a truly unknown character, even for scripts or
+emoji it never saw during training. The tradeoff is that a single visible
+character can sometimes be split across more than one token when its
+byte sequence does not line up neatly with a previously learned merge.
+
+None of these differences are purely academic. A tokenizer trained
+mostly on English text will typically need noticeably more tokens to
+represent the same sentence in Japanese or Korean than a tokenizer
+trained on a balanced multilingual corpus, simply because it never
+learned efficient merges for those scripts. This is one of the reasons
+comparing tokenizers fairly requires reporting vocabulary size and
+training corpus alongside any compression ratio, rather than treating a
+single number as a verdict on which algorithm is objectively better.

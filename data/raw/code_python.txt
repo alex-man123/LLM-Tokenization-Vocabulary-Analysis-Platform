@@ -1,0 +1,107 @@
+"""A small, self-contained example module used as a Python-code dataset.
+
+This file is real, runnable Python — not a snippet of prose about code —
+so tokenizers can be exercised against realistic identifiers, string
+literals, indentation, and comments. Casing is deliberately mixed
+(myVariable, MyClass, MY_CONSTANT) because case is meaningful in Python
+and must never be normalized away.
+"""
+
+from __future__ import annotations
+
+import json
+from collections import defaultdict
+from dataclasses import dataclass, field
+from pathlib import Path
+
+MAX_RETRIES = 3
+DEFAULT_TIMEOUT_SECONDS = 30.0
+_CACHE: dict[str, "InventoryItem"] = {}
+
+
+@dataclass
+class InventoryItem:
+    """A single item tracked by the warehouse system."""
+
+    sku: str
+    name: str
+    quantity: int = 0
+    unit_price: float = 0.0
+    tags: list[str] = field(default_factory=list)
+
+    @property
+    def total_value(self) -> float:
+        return self.quantity * self.unit_price
+
+    def apply_discount(self, percent: float) -> None:
+        if not 0 <= percent <= 100:
+            raise ValueError(f"percent must be between 0 and 100, got {percent}")
+        self.unit_price *= 1 - percent / 100
+
+
+class WarehouseManager:
+    """Coordinates inventory items across multiple warehouse locations."""
+
+    def __init__(self, warehouseName: str, *, maxRetries: int = MAX_RETRIES) -> None:
+        self.warehouseName = warehouseName
+        self.maxRetries = maxRetries
+        self._items: dict[str, InventoryItem] = {}
+        self._byTag: dict[str, list[str]] = defaultdict(list)
+
+    def addItem(self, item: InventoryItem) -> None:
+        # Re-adding an existing SKU overwrites the previous record.
+        self._items[item.sku] = item
+        for tag in item.tags:
+            self._byTag[tag].append(item.sku)
+
+    def findByTag(self, tag: str) -> list[InventoryItem]:
+        return [self._items[sku] for sku in self._byTag.get(tag, []) if sku in self._items]
+
+    def totalInventoryValue(self) -> float:
+        return sum(item.total_value for item in self._items.values())
+
+    def exportToJson(self, path: Path) -> None:
+        payload = {
+            "warehouse": self.warehouseName,
+            "items": [
+                {
+                    "sku": item.sku,
+                    "name": item.name,
+                    "quantity": item.quantity,
+                    "unit_price": item.unit_price,
+                    "tags": item.tags,
+                }
+                for item in self._items.values()
+            ],
+        }
+        path.write_text(json.dumps(payload, indent=2), encoding="utf-8")
+
+
+def load_manager_from_json(path: Path) -> WarehouseManager:
+    """Reconstruct a WarehouseManager from a file written by exportToJson()."""
+    raw = json.loads(path.read_text(encoding="utf-8"))
+    manager = WarehouseManager(raw["warehouse"])
+    for entry in raw["items"]:
+        manager.addItem(InventoryItem(**entry))
+    return manager
+
+
+def _retry(fn, *, attempts: int = MAX_RETRIES):
+    last_error: Exception | None = None
+    for attempt in range(1, attempts + 1):
+        try:
+            return fn()
+        except (OSError, ValueError) as exc:
+            last_error = exc
+            print(f"attempt {attempt}/{attempts} failed: {exc!r}")
+    raise RuntimeError("all retries exhausted") from last_error
+
+
+if __name__ == "__main__":
+    manager = WarehouseManager("north_dc_01", maxRetries=5)
+    manager.addItem(InventoryItem(sku="SKU-001", name="USB-C Cable", quantity=250, unit_price=4.99, tags=["cables", "electronics"]))
+    manager.addItem(InventoryItem(sku="SKU-002", name="27in Monitor", quantity=12, unit_price=189.5, tags=["electronics", "displays"]))
+    manager._items["SKU-002"].apply_discount(10)
+    print(f"Total inventory value: ${manager.totalInventoryValue():.2f}")
+    for item in manager.findByTag("electronics"):
+        print(f" - {item.name} x{item.quantity} (${item.unit_price:.2f} each)")

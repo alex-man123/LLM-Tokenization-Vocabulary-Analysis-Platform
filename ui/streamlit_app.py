@@ -15,6 +15,11 @@ st.title("LLM Tokenization & Vocabulary Analysis Platform")
 st.write(
     "Use the sidebar to navigate.\n\n"
     "- **Tokenize** — run one tokenizer over a piece of text.\n"
-    "- **Compare** — run several tokenizers on the same text, side by side.\n"
-    "- **Vocabulary**, **Benchmark**, **Experiments** — placeholders for later phases."
+    "- **Compare** — run several tokenizers (including real external ones) "
+    "on the same text, side by side.\n"
+    "- **Vocabulary** — inspect a trained tokenizer's vocabulary size, "
+    "most-frequent tokens, and rare tokens.\n"
+    "- **How LLMs Use Tokens** — a purely illustrative walk through "
+    "text → tokens → token IDs → (illustrative) embeddings.\n"
+    "- **Benchmark**, **Experiments** — placeholders for later phases."
 )

@@ -2,8 +2,10 @@
 
 This document tracks the project's data conventions and schemas as they are
 established. It grows with each phase; so far it covers the raw text
-convention, the experiment result schema, the vocabulary manager, and the
-character/word/BPE tokenizers built on top of it.
+convention, the experiment result schema, the vocabulary manager, the
+character/word/BPE/WordPiece tokenizers and external adapters built on top
+of it, benchmarking (metrics, timing, export), and the Phase 6 dataset
+loader/Experiment Runner/aggregation pipeline built on top of all of that.
 
 ## Raw text data (`data/raw/*.txt`)
 
@@ -17,6 +19,44 @@ character/word/BPE tokenizers built on top of it.
 - Raw files are input data, not build output: nothing in the codebase may
   modify files under `data/raw/` automatically. Adding or replacing a
   dataset is a manual, reviewed change.
+
+All 9 categories above exist (Task 6.1), each ~2-5 KB of original text
+written for this project (not copied verbatim from an external source, to
+avoid licensing concerns) — `ro.txt` additionally includes a few
+deliberate instances of the legacy Turkish-cedilla ş/ţ mixed in among the
+correct comma-below ș/ț, to give the loader's normalization step (below) a
+real, representative case to fix, not just a synthetic unit-test string.
+
+### Dataset loader & preprocessing (`src/experiments/dataset_loader.py`, Task 6.2)
+
+`load_dataset(name) -> (text, DatasetMetadata)` / `load_all_datasets() ->
+dict[str, (text, DatasetMetadata)]` are the single way any code in this
+project reads `data/raw/`. `DatasetMetadata` carries `name` (the category/
+file stem, e.g. `"ro"`), `language_or_type` (e.g. `"romanian"`,
+`"python_code"` — one field covers both concepts, since this project's
+categories are language *or* text-type, not both at once for any given
+category), `source`, `length_chars`, and `length_bytes`.
+
+**Normalization — `unicodedata.normalize("NFC", text)` — is mandatory,
+first, and applied uniformly to every category**, with no per-category
+exceptions and, critically, **no lowercasing**: Python identifiers and URL
+paths are case-sensitive, so a global lowercase step would destroy
+information a tokenizer should see. NFC correctly unifies composed vs.
+decomposed Unicode forms (e.g. Japanese "が" as one precomposed codepoint
+vs. base + combining voiced-sound-mark; Romanian "â" as one codepoint vs.
+"a" + combining circumflex).
+
+> **Correction to a common claim about Romanian ș/ț:** plain NFC does
+> **not** unify the legacy Turkish-cedilla forms (ş U+015F, ţ U+0163) with
+> the correct Romanian comma-below forms (ș U+0219, ț U+021B) — verified:
+> their canonical decompositions are `s + COMBINING CEDILLA` vs.
+> `s + COMBINING COMMA BELOW`, two different base+combiner pairs, so NFC
+> has nothing to fold together. `dataset_loader.normalize_text` fixes this
+> anyway, as an explicit, separate, four-character translation table
+> applied right after NFC — narrow enough to apply uniformly to every
+> category with no risk to non-Romanian text. See the module's docstring
+> for the full explanation; do not repeat the claim that NFC alone solves
+> this.
 
 ## Vocabulary Manager (`src/vocabulary/`)
 
@@ -299,8 +339,13 @@ Comparator, or the UI. It reads only a tokenizer's public API
   `None` when `number_of_tokens == 0`. See the note above: intentionally
   not the same formula as `characters_per_token`.
 - `vocab_size` — `tokenizer.vocab_size`, unrelated to the current text.
-- `encoding_time`/`decoding_time` — reserved fields, always `None` until
-  Task 5.2 (timing) is implemented.
+- `encoding_time`/`decoding_time` — reserved fields; `compute_metrics`
+  itself always leaves them `None`. Task 5.2 (`src/benchmarking/timer.py`,
+  below) implements the actual timing separately, so a caller that wants
+  both metrics and timing for the same run merges the two rather than
+  `compute_metrics` calling the timer itself — timing every `encode`/
+  `decode` call would slow down the common case (a metrics-only
+  comparison) for no benefit.
 
 ## Benchmarking: Comparator (`src/benchmarking/comparator.py`, Task 5.3)
 
@@ -319,9 +364,84 @@ Any consumer of this DataFrame (the Streamlit Compare page included) must
 show `vocab_size` alongside the other metrics, not report them in
 isolation.
 
+## Benchmarking: timing (`src/benchmarking/timer.py`, Task 5.2)
+
+`measure_tokenizer_timing(tokenizer, text, n_iterations=10) -> TokenizerTiming`
+measures `encode`/`decode` reliably: one unmeasured warm-up call per
+operation, then `n_iterations` measured repetitions, summarized as
+`TimingResult(mean_ms, median_ms, samples_ms)` for each of `.encode`/
+`.decode`. Always in **milliseconds**, matching the `encode_time_ms`/
+`decode_time_ms` fields of the experiment result schema above — the one
+place these numbers are computed, never duplicated in the Comparator,
+export, or UI.
+
+- Uses `time.perf_counter()` (monotonic, high-resolution), never
+  `time.time()`.
+- `decode` is timed against IDs from a single `encode` call made once,
+  up front — its timing loop never re-encodes, so it never measures
+  encode+decode as one operation.
+- `n_iterations < 1` raises `ValueError` rather than producing a
+  meaningless empty/NaN result.
+- Works with any `Tokenizer`, including the external adapters below —
+  there is no separate timer for adapters.
+
+## Benchmarking: result export (`src/benchmarking/export.py`, Task 5.4)
+
+`export_results_csv`/`export_results_json` persist a Comparator-style
+DataFrame to `data/results/` (or any path; parent directories are created
+automatically), reshaped to match the experiment result schema above via
+`to_experiment_schema`: `number_of_tokens` -> `num_tokens`,
+`encoding_time`/`decoding_time` -> `encode_time_ms`/`decode_time_ms`, plus
+the schema's `dataset` (required) and `timestamp` (defaults to now, UTC)
+fields, which the Comparator itself has no notion of. The Comparator's
+`tokens` column — not part of the documented schema, but explicitly not to
+be dropped — is preserved: a native list per row in JSON, a JSON-encoded
+string per cell in CSV (CSV has no list type). `overwrite=True` by default
+(matching every other `save`/serialization path in this project, e.g.
+`vocabulary.serialization.save_tokenizer_state`); `overwrite=False` raises
+`FileExistsError` instead of silently replacing an existing file.
+`load_results_json` reads a file `export_results_json` wrote, back into a
+DataFrame with the same columns.
+
+Neither function retokenizes or recomputes anything — they only consume
+results the Comparator already produced.
+
+## External tokenizer adapters (`src/tokenizers/adapters/`, Phase 7)
+
+`HuggingFaceTokenizerAdapter` (Task 7.1) and `TiktokenAdapter` (Task 7.2)
+wrap a real, pretrained external tokenizer behind this project's
+`Tokenizer` interface, so either can be passed to the Comparator exactly
+like `BPETokenizer`/`WordPieceTokenizer` — **no Comparator changes were
+needed**. Both translate an existing library's API rather than
+reimplementing any tokenization algorithm, and both treat `train()` as a
+deliberate no-op (per `Tokenizer.train`'s own docstring: an adapter
+wrapping an already-pretrained external tokenizer loads state via `load`
+instead).
+
+- **`HuggingFaceTokenizerAdapter`**: wraps a `tokenizers.Tokenizer` (the
+  pip-installed Hugging Face library). Load via `from_pretrained(id)` (a
+  Hugging Face Hub identifier, e.g. `"bert-base-uncased"`), `from_file`/
+  `load` (a local `tokenizer.json`), or by passing an already-built
+  `tokenizers.Tokenizer` to the constructor. `tokenize`/`encode`/`decode`/
+  `vocab_size` all delegate to the wrapped tokenizer's own API — IDs are
+  the library's real IDs, never re-numbered. See `docs/limitations.md` for
+  why this module has to work around a name collision between this
+  project's own `tokenizers` package and the pip-installed one of the same
+  name.
+- **`TiktokenAdapter`**: wraps a `tiktoken.Encoding`. Load via
+  `from_encoding_name` (e.g. `"cl100k_base"`), `for_model` (e.g.
+  `"gpt-4"`), or by passing an already-built `tiktoken.Encoding` to the
+  constructor. `decode` always uses `tiktoken`'s own (lossless) decode;
+  `tokenize`'s per-token strings are a best-effort visualization that can
+  show `�` for a token whose raw bytes are not independently valid UTF-8 —
+  expected byte-level BPE behavior, not a bug. See "Character-level BPE
+  vs. byte-level BPE" in `docs/limitations.md` for the full explanation of
+  why `tiktoken` and this project's own `BPETokenizer` are not directly
+  comparable algorithms operating on the same units.
+
 ## Token frequency analysis (`src/vocabulary/frequency_analysis.py`, Task 4.3)
 
-Feeds the planned "Vocabulary" UI page: how often each token a trained
+Feeds the "Vocabulary" UI page (below): how often each token a trained
 tokenizer actually produces occurs across a training corpus, which tokens
 are rare, and which dominate. Mirrors `benchmarking.metrics`'s "pure
 function + dataclass" pattern — no Streamlit dependency.
@@ -348,12 +468,69 @@ entries appear rarely, a long tail. This is why growing a vocabulary size
 has diminishing returns: most of the added capacity goes to rarely-used
 tokens, not to better covering the common case.
 
+## Experiment Runner (`src/experiments/runner.py`, Task 6.3)
+
+`ExperimentConfig(tokenizer_names, dataset_categories)` (defaults: every
+`tokenizers.registry.AVAILABLE_TOKENIZERS` entry x every
+`experiments.dataset_loader.DATASET_CATEGORIES`) and
+`run_experiment(config) -> pandas.DataFrame` automate running the existing
+pipeline over the whole Tokenizer x Dataset matrix, reusing every prior
+task rather than reimplementing any of them:
+
+```text
+Dataset Loader (6.2) -> Tokenizer (trained live) -> Comparator (5.3) -> schema (5.4) -> combined table
+```
+
+Each dataset's `compare_tokenizers` call is stamped with *that* dataset's
+name and `language_or_type` via `benchmarking.export.to_experiment_schema`
+**separately**, before all datasets' rows are concatenated — calling
+`export_results_csv`/`export_results_json` (which stamp one shared
+`dataset` value on every row) on the combined multi-dataset table would
+have overwritten each row's correct dataset. This is why
+`benchmarking.export` also exposes lower-level `export_schema_csv`/
+`export_schema_json` (write an already-schema-shaped DataFrame as-is,
+Task 5.4): `run_and_export_experiment(config, csv_path=..., json_path=...)`
+uses those to write the combined table without re-stamping it.
+
+**Reproducibility**: every step (`load_dataset`, a tokenizer's own
+`train`/`encode`, `compare_tokenizers`, `to_experiment_schema`) is
+deterministic, so running the same `ExperimentConfig` twice produces
+identical rows (aside from the `timestamp` field, which is wall-clock by
+design) — no seeding is needed because nothing here is random.
+
+## Result aggregation (`src/experiments/aggregation.py`, Task 6.4)
+
+`aggregate_by_group_and_tokenizer(results, group_column="language_or_type")`
+and `aggregate_by_group(results, group_column="language_or_type")` group an
+Experiment Runner-shaped DataFrame with plain `pandas.groupby(...).agg(...)`
+(mean/median by default) — no manual aggregation loops. `group_column`
+defaults to `"language_or_type"` but accepts e.g. `"dataset"` for
+finer-grained grouping.
+
+**Interpretation guardrail (load-bearing):** `describe_observations(results,
+group_column=..., metric=...)` produces one sentence per `(group value,
+tokenizer)` pair, always phrased as *"in this experiment's dataset,
+tokenizer 'X' produced a mean \<metric\> of \<value\> for
+\<group_column\>='\<value\>'"* — never as a universal claim about a
+language or text type ("Japanese is harder to tokenize"). A few KB of text
+per category cannot support that broader claim; every consumer of this
+module's output (`docs/experiment_results.md`, any future UI) must
+preserve that scoped framing rather than shortening it away.
+
+`scripts/run_experiments.py` is the single script that ties the whole
+pipeline together end to end: it runs the full default matrix, writes
+`data/results/experiment_results.{csv,json}` (Task 5.4), computes the
+aggregations above, and regenerates `docs/experiment_results.md` from
+those real, just-computed numbers — never from invented ones. Re-run it
+after changing a tokenizer, a dataset, or the aggregation logic.
+
 ## Streamlit UI (`ui/`, Phase 8)
 
 `ui/streamlit_app.py` is the entry point; `ui/pages/` holds the pages
 Streamlit's classic `pages/` convention auto-discovers (numbered filenames
 control sidebar order: `1_Tokenize.py`, `2_Compare.py`, `3_Vocabulary.py`,
-`4_Benchmark.py`, `5_Experiments.py`). The UI is intentionally thin — pages
+`4_Benchmark.py`, `5_Experiments.py`, `6_How_LLMs_Use_Tokens.py`). The UI
+is intentionally thin — pages
 only call `tokenizers.registry`, a tokenizer's own `train`/`tokenize`/`encode`,
 and `benchmarking.comparator.compare_tokenizers`; no tokenization, metrics,
 or comparison logic lives in `ui/`.
@@ -367,11 +544,30 @@ or comparison logic lives in `ui/`.
   user enters — this is a deliberate demo simplification (documented on
   the page itself), not a hidden default.
 - **Compare** (`2_Compare.py`, Task 8.3): the same idea, but for several
-  tokenizers (multi-select) trained on one shared input text, displayed as
-  a metrics table (via the Comparator) plus each tokenizer's token list.
-  Always shows the fair-comparison disclaimer and `vocab_size`.
-- **Vocabulary**, **Benchmark**, **Experiments**: placeholder pages for
-  later phases.
+  tokenizers (multi-select) on one shared input text, displayed as a
+  metrics table (via the Comparator) plus each tokenizer's token list.
+  Always shows the fair-comparison disclaimer (referencing
+  `docs/benchmarking_methodology.md`, Task 7.4) and `vocab_size`. Besides
+  this project's own trainable tokenizers, the two external adapters
+  (Task 7.1/7.2) are offered as additional, opt-in selections — not
+  selected by default, since loading a real pretrained tokenizer can need
+  network access on first use; `@st.cache_resource` avoids reloading one
+  on every rerun once selected. Passed to `compare_tokenizers` exactly like
+  any other `Tokenizer`, with no Comparator changes.
+- **Vocabulary** (`3_Vocabulary.py`, Task 8.4): selects one of this
+  project's own tokenizers, trains it live on an entered corpus (the same
+  text doubles as the corpus `vocabulary.frequency_analysis` counts over),
+  and shows vocabulary size, a top-N frequent-token bar chart, and a rare-
+  token table — all computed by Task 4.3's functions, never recomputed
+  here.
+- **How LLMs Use Tokens** (`6_How_LLMs_Use_Tokens.py`, Task 8.6): a purely
+  illustrative walk through `Text -> Tokens -> Token IDs -> Embedding
+  lookup -> Vectors -> Model`. Only the first three steps use real
+  components (`tokenizers.registry`); the "embeddings" are `random`-module
+  vectors seeded by token ID (fixed per token ID, not real learned
+  parameters), and the page never claims or implements a next-token
+  prediction — everything past "Token IDs" is labeled illustrative.
+- **Benchmark**, **Experiments**: placeholder pages for later phases.
 
 Pages are tested with `streamlit.testing.v1.AppTest`
 (`tests/test_ui_pages.py`), which actually executes each page script

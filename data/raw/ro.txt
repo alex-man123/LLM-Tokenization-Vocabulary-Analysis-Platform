@@ -1,0 +1,54 @@
+Procesarea limbajului natural este o ramură a inteligenței artificiale
+care se ocupă cu înțelegerea și generarea textului scris de oameni.
+Înainte ca un model de limbaj să poată prezice următorul cuvânt dintr-o
+propoziție, textul brut trebuie împărțit în unități mai mici, numite
+jetoane, iar fiecare jeton trebuie transformat într-un număr întreg pe
+care modelul îl poate înțelege prin intermediul unui tabel de vectori
+numit tabelă de îmbinare (embedding).
+
+Limba română pune câteva probleme interesante pentru tokenizare, tocmai
+din cauza diacriticelor. Literele ș și ț, cu virgulă dedesubt, sunt
+adesea confundate cu variantele mai vechi ş și ţ, care au sedilă în loc
+de virgulă. Cele două perechi de caractere arată aproape identic pe
+ecran, însă din punctul de vedere al calculatorului sunt simboluri
+complet diferite. Dacă un corpus de antrenare amestecă cele două
+convenții, un tokenizer neantrenat corespunzător va trata cuvântul
+"țară" scris cu virgulă ca fiind complet diferit de "ţară" scris cu
+sedilă, fragmentând inutil vocabularul și micșorând calitatea
+segmentării pentru texte românești.
+
+De aceea, normalizarea Unicode este un pas obligatoriu, nu opțional,
+înainte de antrenarea oricărui tokenizer pe text românesc. Normalizarea
+NFC unifică formele compuse și descompuse ale acelorași caractere, însă
+nu rezolvă, din păcate, problema specifică a cedilei față de virgulă —
+cele două variante nu sunt echivalente din punct de vedere canonic în
+standardul Unicode, așa că este nevoie de un pas suplimentar, explicit,
+care înlocuiește literele cu sedilă cu literele corecte, cu virgulă
+dedesubt.
+
+Un alt aspect important este că normalizarea nu trebuie să includă
+transformarea textului în litere mici. Codul sursă și adresele web sunt
+sensibile la majuscule: o variabilă numită "numarStudenti" nu este
+același lucru cu "NumarStudenti", iar un domeniu scris cu majuscule
+rămâne valid și identic ca destinație. Din acest motiv, singura
+transformare aplicată tuturor categoriilor de text din acest proiect este
+normalizarea Unicode, niciodată transformarea în litere mici.
+
+Educația în domeniul inteligenței artificiale a crescut semnificativ în
+România în ultimii ani. Tot mai mulți studenți își doresc să înțeleagă
+nu doar cum se folosește un model de limbaj gata antrenat, ci și cum
+funcționează algoritmii din spatele lui: de la tokenizare, la
+antrenarea vocabularului, până la mecanismele de atenție care permit
+modelului să "citească" un text întreg simultan. Această platformă
+educațională își propune exact acest lucru: să demonstreze, pas cu pas,
+cum se construiește un tokenizer de la zero, pornind de la simpla
+împărțire pe caractere și ajungând până la algoritmi precum BPE și
+WordPiece, folosiți efectiv de modelele de limbaj din producție.
+
+Bunicii noștri nu foloseau cuvântul "tokenizare", dar principiul de bază
+— împărțirea unui întreg în părți mai mici și mai ușor de gestionat — nu
+este deloc nou. Ceea ce este nou este scara la care se aplică astăzi
+această idee simplă: vocabulare de zeci sau sute de mii de jetoane,
+antrenate pe miliarde de cuvinte, pentru a construi modele capabile să
+scrie, să traducă și să răspundă la întrebări în zeci de limbi diferite,
+inclusiv în limba română.

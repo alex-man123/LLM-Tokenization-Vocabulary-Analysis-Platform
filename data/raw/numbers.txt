@@ -1,0 +1,42 @@
+Integers: 0 1 2 3 5 8 13 21 34 55 89 144 233 377 610 987
+Negative integers: -1 -7 -42 -100 -999 -12345
+Large integers: 1000000 2147483647 9223372036854775807 100000000000
+Decimals: 3.14159 2.71828 0.5 0.001 123.456 -0.75 9999.99
+Scientific notation: 6.022e23 1.6e-19 2.998e8 1e-10 5.5e2
+Percentages: 0% 12.5% 50% 99.9% 100% 150% 0.01% 33.333%
+Fractions: 1/2 3/4 5/8 22/7 1/3 7/16
+Currency: $19.99 $1,000.00 €45.50 £3.75 ¥1000 $0.99 $1,234,567.89
+Dates (ISO): 2024-01-01 2025-12-31 1999-06-15 2026-09-02 0001-01-01
+Dates (other formats): 01/15/2024 15-01-2024 January 1, 2024 Jan 1 2024 2024/01/15
+Times: 09:30:00 23:59:59 12:00 00:00:01 3:45 PM 14:30:00.500
+Phone numbers: +1-555-123-4567 (555) 123-4567 +44 20 7946 0958 +40 721 234 567
+Coordinates: 45.4215 N, 75.6972 W 35.6895 N, 139.6917 E -33.8688, 151.2093
+Version numbers: v1.0.0 v2.13.4 v0.0.1-alpha 3.11.0 10.15.7
+Binary and hex: 0b1010 0b11111111 0xFF 0x1A2B3C 0o777
+Sequences: 1, 2, 3, 4, 5 10, 20, 30, 40, 50 2, 4, 8, 16, 32, 64, 128
+Statistics: mean = 42.7, median = 40, std_dev = 5.31, n = 128
+Scores: 7/10 85/100 4.5/5.0 A+ 98% B- 72%
+Measurements: 5.5 kg 180 cm 3.2 km 98.6 F 37 C 15 mph 60 Hz
+Ratios: 16:9 4:3 1:1 3:2 21:9
+Ranges: 18-65 0-100 -40 to 120 1-31
+Ordinals: 1st 2nd 3rd 4th 21st 42nd 100th
+Repeated digits: 111 222 333 4444 55555 000000
+Random mixed values: 7, -3.5, 1000000, 0.0001, 42%, 2024-01-01, 3/4, 0xFF
+Population estimates: 8,045,311,447 331,900,000 19,000,000 1,412,600,000
+Temperature ranges: -273.15 C, 0 C, 100 C, 37 C, -40 F
+File sizes: 1024 bytes, 2.5 MB, 1.2 GB, 500 KB, 3 TB
+Pi to 20 digits: 3.14159265358979323846
+Negative percentages and changes: -5.2% -0.01% +12.3% +100%
+Interest rates: 4.5% APR, 0.25% monthly, 21.99% variable
+Exchange rates: 1 USD = 0.92 EUR, 1 EUR = 1.09 USD, 1 GBP = 1.27 USD
+Distances: 384,400 km to the Moon, 149,600,000 km to the Sun
+Ages: 7 years old, 25, 42, 78 years old, 100th birthday
+Quiz scores over a semester: 88, 92, 76, 95, 100, 81, 89, 93
+Sports scores: 3-1, 21-18, 110-104, 0-0, 7-6 (5-3)
+Standard deviations: sigma = 1, 2-sigma, 3-sigma event
+Weights: 0.5 lb, 12 oz, 2.3 kg, 500 g, 1 ton
+Loan amounts: $250,000.00 over 30 years at 6.5% APR
+Server ports: 80, 443, 8080, 3306, 5432, 6379, 27017
+IPv4 addresses embedded in text: 10.0.0.1, 192.168.0.254, 172.16.0.1
+Chapter and verse style numbering: 3:16, 12:1-3, 1:1
+

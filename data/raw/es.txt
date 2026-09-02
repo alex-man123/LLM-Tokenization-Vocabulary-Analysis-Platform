@@ -1,0 +1,49 @@
+El procesamiento del lenguaje natural es una rama de la inteligencia
+artificial que se ocupa de comprender y generar texto escrito por
+personas. Antes de que un modelo de lenguaje pueda predecir la siguiente
+palabra de una oración, el texto original debe dividirse en unidades más
+pequeñas, llamadas tokens, y cada token debe convertirse en un número
+entero que el modelo pueda interpretar mediante una tabla de vectores
+llamada tabla de incrustación.
+
+El español, como el rumano, tiene sus propios desafíos para la
+tokenización debido a los signos diacríticos. Las vocales acentuadas —á,
+é, í, ó, ú— y la letra eñe —ñ— son fundamentales para distinguir
+palabras que, de otro modo, significarían algo completamente distinto.
+La palabra "año" no es lo mismo que "ano", y "papá" no es lo mismo que
+"papa"; un tokenizer que ignore estas diferencias, o que las normalice
+de forma incorrecta, puede introducir errores sutiles pero importantes
+en la segmentación del texto.
+
+Por esta razón, la normalización Unicode NFC es un paso obligatorio,
+aplicado de manera uniforme a todas las categorías de texto de este
+proyecto, incluyendo el español. NFC unifica las formas compuestas y
+descompuestas de un mismo carácter — por ejemplo, una "ñ" puede llegar
+representada como un único carácter precompuesto o como una "n" seguida
+de una virgulilla combinante separada — sin alterar el significado ni el
+contenido del texto original.
+
+Es igual de importante lo que este proyecto no hace: nunca convierte el
+texto a minúsculas de forma automática. El código fuente y las
+direcciones web distinguen entre mayúsculas y minúsculas: una variable
+llamada "miVariable" no es la misma que "MiVariable", y una URL con
+mayúsculas en su ruta puede apuntar a un recurso completamente diferente
+del que apunta la misma URL en minúsculas. La única transformación que
+se aplica a cualquier categoría de texto en este proyecto es la
+normalización Unicode NFC; nunca se aplica una conversión a minúsculas.
+
+En los últimos años, cada vez más estudiantes de habla hispana se
+interesan por entender cómo funcionan realmente los modelos de lenguaje
+por dentro, más allá de simplemente usarlos a través de una interfaz de
+chat. Comprender la tokenización — cómo un texto se convierte en
+números, cómo se entrena un vocabulario desde cero, y por qué dos
+tokenizadores distintos pueden segmentar la misma oración de maneras muy
+diferentes — es un primer paso esencial para entender el resto del
+proceso: los embeddings, los mecanismos de atención, y finalmente la
+predicción del siguiente token.
+
+Comparar un tokenizador propio, entrenado en un corpus pequeño, con un
+tokenizador de producción entrenado en miles de millones de palabras
+puede ser útil para fines educativos, pero nunca debería usarse para
+concluir que un algoritmo es mejor que otro sin tener en cuenta el
+tamaño del vocabulario y el corpus de entrenamiento de cada uno.
