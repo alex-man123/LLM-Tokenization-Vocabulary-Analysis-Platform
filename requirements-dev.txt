@@ -1,6 +1,5 @@
-# Minimal dependencies for Phase 0 (project setup & foundations).
-# Runtime dependencies (numpy, pandas, tokenizers, tiktoken, sentencepiece,
-# streamlit, matplotlib, ...) are introduced in later phases, only once the
-# code that actually needs them exists.
+# Dev tooling, on top of runtime dependencies (requirements.txt).
+-r requirements.txt
+
 pytest>=8.0
 ruff>=0.6

@@ -11,6 +11,7 @@ against production tokenizers (Hugging Face `tokenizers`, `tiktoken`, `sentencep
 
 ```text
 src/            # core tokenizers, vocabulary manager, external adapters, benchmarking
+ui/             # Streamlit dashboard (thin UI layer over src/)
 tests/          # unit / integration / regression tests
 data/raw/       # raw text datasets used as experiment input
 data/results/   # experiment results (JSON/CSV), see docs/architecture.md
@@ -33,7 +34,21 @@ pip install -r requirements-dev.txt
 pytest
 ```
 
+## Running the dashboard
+
+```bash
+streamlit run ui/streamlit_app.py
+```
+
 ## Status
 
-Project setup is in progress (Phase 0 — foundations). Tokenization algorithms and
-the benchmarking dashboard are not implemented yet.
+Implemented so far: project foundations, the abstract `Tokenizer` contract, the
+central `Vocabulary`/special-tokens manager and generalized serialization, the
+character-level, word-level, and BPE tokenizers, benchmarking metrics + a
+tokenizer Comparator, and a Streamlit dashboard (Tokenize and Compare pages;
+Vocabulary/Benchmark/Experiments are placeholders). The BPE implementation is
+the classical **character-level BPE with a `</w>` word-boundary marker**
+(Sennrich et al., 2015) — not the byte-level BPE used by GPT-style
+models/`tiktoken`; see [docs/architecture.md](docs/architecture.md) for why
+that distinction matters. WordPiece, external tokenizer adapters, and
+encode/decode timing (Task 5.2) are not implemented yet.
