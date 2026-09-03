@@ -10,6 +10,11 @@ fixed-seed-per-token-ID vectors generated with the standard library `random`
 module, labeled as illustrative everywhere they appear. No `next_token`
 prediction is actually computed; the pipeline stops at "a model would take
 it from here."
+
+The pipeline above is rendered as a color-coded SVG (Task 8.13,
+`ui/diagrams.py`) — real stages and illustrative-only stages get different
+colors from the shared `theme.PIPELINE_COLORS`, on top of (not instead of)
+the text disclaimer below it.
 """
 
 from __future__ import annotations
@@ -24,49 +29,25 @@ _UI_DIR = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(_UI_DIR.parent / "src"))
 sys.path.insert(0, str(_UI_DIR))
 
+import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
+import plotly.express as px  # noqa: E402
 import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
+from diagrams import render_pipeline_diagram, render_pipeline_legend  # noqa: E402
 from embeddings_3d import (  # noqa: E402
     DEFAULT_EMBEDDING_DIMENSIONS,
     generate_illustrative_embeddings,
     pca_3d,
 )
-from theme import inject_theme  # noqa: E402
+from next_token_demo import candidate_tokens, random_probabilities  # noqa: E402
+from theme import get_tokenizer_color, inject_theme  # noqa: E402
 
 from tokenizers.registry import AVAILABLE_TOKENIZERS, create_tokenizer  # noqa: E402
 
-_EMBEDDING_DIMENSIONS = 8
+_NEXT_TOKEN_SEED_KEY = "next_token_reroll_seed"
 
-_PIPELINE_DIAGRAM = """\
-┌─────────────────┐
-│       TEXT       │
-└─────────┬─────────┘
-          ↓
-┌─────────────────┐
-│   TOKENIZATION    │   <- real: the tokenizer you picked below
-└─────────┬─────────┘
-          ↓
-┌─────────────────┐
-│      TOKENS       │   <- real
-└─────────┬─────────┘
-          ↓
-┌─────────────────┐
-│    TOKEN IDs       │   <- real
-└─────────┬─────────┘
-          ↓
-┌───────────────────────────┐
-│      EMBEDDING LOOKUP       │   <- ILLUSTRATIVE ONLY (random vectors)
-└─────────────┬───────────────┘
-              ↓
-┌───────────────────────────┐
-│          VECTORS             │   <- ILLUSTRATIVE ONLY
-└─────────────┬───────────────┘
-              ↓
-┌───────────────────────────┐
-│  MODEL -> NEXT-TOKEN PREDICTION │   <- not computed here at all
-└───────────────────────────┘\
-"""
+_EMBEDDING_DIMENSIONS = 8
 
 
 def _illustrative_embedding(token_id: int, dimensions: int = _EMBEDDING_DIMENSIONS) -> list[float]:
@@ -93,7 +74,8 @@ st.write(
     "next token."
 )
 
-st.code(_PIPELINE_DIAGRAM, language=None)
+st.markdown(render_pipeline_diagram(), unsafe_allow_html=True)
+st.markdown(render_pipeline_legend(), unsafe_allow_html=True)
 
 st.warning(
     "**Everything from \"Embedding lookup\" onward on this page is "
@@ -147,6 +129,53 @@ else:
                 "through its layers to predict the next token's ID. This page "
                 "stops here — no model is implemented or simulated."
             )
+            st.warning(
+                "Illustrative only — random probabilities, not a real model's output."
+            )
+            candidates = candidate_tokens(tokenizer.special_tokens)
+            if len(candidates) < 2:
+                st.caption(
+                    "Not enough distinct vocabulary entries yet to show a candidate "
+                    "distribution — enter more/different text above."
+                )
+            else:
+                if _NEXT_TOKEN_SEED_KEY not in st.session_state:
+                    st.session_state[_NEXT_TOKEN_SEED_KEY] = int(
+                        np.random.default_rng().integers(0, 2**31)
+                    )
+                if st.button("🎲 Reroll probabilities"):
+                    st.session_state[_NEXT_TOKEN_SEED_KEY] = int(
+                        np.random.default_rng().integers(0, 2**31)
+                    )
+                probabilities = random_probabilities(
+                    len(candidates), st.session_state[_NEXT_TOKEN_SEED_KEY]
+                )
+                prediction_df = pd.DataFrame(
+                    {"candidate": candidates, "probability": probabilities}
+                )
+                fig_prediction = px.bar(
+                    prediction_df,
+                    x="candidate",
+                    y="probability",
+                    color_discrete_sequence=[get_tokenizer_color(tokenizer_name)],
+                    labels={
+                        "candidate": "Candidate next token",
+                        "probability": "Probability (fake)",
+                    },
+                )
+                fig_prediction.update_layout(
+                    showlegend=False,
+                    yaxis_range=[0, 1],
+                    margin={"l": 0, "r": 0, "t": 10, "b": 0},
+                )
+                st.plotly_chart(fig_prediction, width="stretch")
+                st.caption(
+                    f"Candidates are real vocabulary entries from the '{tokenizer_name}' "
+                    "tokenizer trained above; the probabilities are random numbers "
+                    f"normalized to sum to {probabilities.sum():.3f} — not computed by "
+                    "any model. Click \"Reroll\" to see them change with nothing else "
+                    "changing, proof there is no real, deterministic prediction here."
+                )
 
             st.subheader("4. Illustrative 3D embedding space")
             st.warning(

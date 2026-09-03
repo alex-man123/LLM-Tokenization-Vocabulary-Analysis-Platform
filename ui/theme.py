@@ -31,6 +31,19 @@ TOKENIZER_COLORS: dict[str, str] = {
 #: must never crash or raise just because a name is unrecognized.
 TOKENIZER_FALLBACK_COLOR = "#8A94A6"
 
+#: Category colors for the "How LLMs Use Tokens" pipeline diagram (Task
+#: 8.13) — kept separate from `TOKENIZER_COLORS` (which is keyed by
+#: tokenizer *identity*, not pipeline stage), but still one central place
+#: so the diagram, its legend, and nothing else define these colors.
+#: `"pipeline_real"` marks a stage this project actually computes (text ->
+#: tokens -> token IDs); `"pipeline_illustrative"` marks a stage that is
+#: only a labeled illustration (embedding lookup onward) — the same
+#: real/illustrative split the page's existing text disclaimer states.
+PIPELINE_COLORS: dict[str, str] = {
+    "pipeline_real": "#4F9DDE",
+    "pipeline_illustrative": "#E0A836",
+}
+
 
 def tokenizer_family(name: str) -> str:
     """The color-lookup key for a tokenizer name, e.g. `"tiktoken:cl100k_base"` -> `"tiktoken"`.
@@ -133,12 +146,91 @@ h1 {{
     transform: translateY(-1px);
     box-shadow: 0 2px 8px var(--accent-secondary);
 }}
+
+/* Task 8.15: the sidebar's own vertical stack (collapse-button header,
+   auto-generated page nav, this page's own `st.sidebar` content) is a
+   plain block layout by default; making it a flex column lets `order`
+   below move our custom brand block between the header and the nav,
+   without touching the header itself. */
+[data-testid="stSidebarContent"] {{
+    display: flex !important;
+    flex-direction: column !important;
+}}
+
+/* Push the auto-generated page list after our brand block (order 0,
+   default, wins the tie with the header via DOM order) instead of
+   pulling the brand above the header too. */
+[data-testid="stSidebarNav"] {{
+    order: 1 !important;
+}}
+
+/* Hides only the nav entry for the main script (`streamlit_app.py`),
+   whose auto-generated label is the literal, generic "streamlit app" —
+   Streamlit derives it from the entry-point filename, underscores
+   replaced with spaces (see `streamlit.source_util.page_icon_and_name`).
+   Matched by its href, which always ends in exactly "/" for the app's
+   root/home page regardless of which page is currently active — every
+   *other* nav link's href ends in "/PageName", never a bare "/". */
+a[data-testid="stSidebarNavLink"][href$="/"] {{
+    display: none !important;
+}}
+
+.sidebar-brand {{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 3px;
+    padding: 14px 4px 2px 4px;
+}}
+
+.sidebar-brand-subtitle {{
+    padding: 2px 4px 12px 4px;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}}
 </style>
 """
 
+#: (pill label, tokenizer family) for the sidebar brand (Task 8.15) —
+#: colors come from `TOKENIZER_COLORS`, the same palette every token pill
+#: elsewhere in the app already uses, so the project's own name is built
+#: from its own central visual concept instead of a one-off logo asset.
+_BRAND_PILLS: tuple[tuple[str, str], ...] = (
+    ("To", "bpe"),
+    ("ken", "wordpiece"),
+    ("Lab", "tiktoken"),
+)
+
+_BRAND_SUBTITLE = "LLM Tokenization Lab"
+
+
+def render_sidebar_brand() -> str:
+    """HTML for the sidebar brand: the project name as colored token pills.
+
+    Reuses the same `.token-pill` CSS class and `TOKENIZER_COLORS` palette
+    as every other token pill in the app (Tokenize/Compare, Task 8.9/8.8)
+    — literally the app's own tokenization concept, applied to its own
+    name, not a separate design.
+    """
+    pills = "".join(
+        f'<span class="token-pill" style="background:{TOKENIZER_COLORS[family]};">'
+        f"{html.escape(label)}</span>"
+        for label, family in _BRAND_PILLS
+    )
+    return (
+        f'<div class="sidebar-brand">{pills}</div>'
+        f'<div class="sidebar-brand-subtitle">{html.escape(_BRAND_SUBTITLE)}</div>'
+    )
+
 
 def inject_theme() -> None:
-    """Apply the shared theme CSS to the current page. Call once, near the top of each page."""
+    """Apply the shared theme CSS and the sidebar brand block. Call once, near the top of each page.
+
+    Folding the sidebar brand into this single call (rather than a second
+    function every page would have to remember to call separately)
+    guarantees it renders identically on every page — every page already
+    calls `inject_theme()` right after `st.set_page_config()`.
+    """
     import streamlit as st
 
     st.markdown(_THEME_CSS, unsafe_allow_html=True)
+    st.sidebar.markdown(render_sidebar_brand(), unsafe_allow_html=True)
