@@ -8,6 +8,7 @@ parse.
 
 from pathlib import Path
 
+import pytest
 from streamlit.testing.v1 import AppTest
 
 UI_DIR = Path(__file__).resolve().parents[1] / "ui"
@@ -255,9 +256,138 @@ def test_how_llms_use_tokens_page_handles_unicode_text():
     assert not at.exception
 
 
-def test_placeholder_pages_run_without_error():
-    for filename in ("4_Benchmark.py", "5_Experiments.py"):
-        at = AppTest.from_file(str(UI_DIR / "pages" / filename))
+def test_benchmark_page_runs_with_default_input():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+
+    assert not at.exception
+    assert len(at.dataframe) == 3  # metrics, timing, cost
+    metrics_df = at.dataframe[0].value
+    assert {"vocab_size", "number_of_tokens", "compression_ratio"} <= set(metrics_df.columns)
+
+
+def test_benchmark_page_shows_encode_decode_timing():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+
+    timing_df = at.dataframe[1].value
+    assert {"encode_mean_ms", "encode_median_ms", "decode_mean_ms", "decode_median_ms"} <= set(
+        timing_df.columns
+    )
+    assert (timing_df["encode_mean_ms"] >= 0).all()
+    assert (timing_df["decode_mean_ms"] >= 0).all()
+
+
+def test_benchmark_page_cost_estimator_matches_the_formula():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+
+    cost_df = at.dataframe[2].value
+    for _, row in cost_df.iterrows():
+        expected = (row["num_tokens"] / 1_000_000) * row["price_per_million"]
+        assert row["estimated_cost"] == pytest.approx(expected)
+
+
+def test_benchmark_page_cost_recalculates_when_price_changes():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+    cost_before = at.dataframe[2].value.set_index("tokenizer")["estimated_cost"]
+
+    at.number_input[0].set_value(at.number_input[0].value * 2).run(timeout=15)
+    cost_after = at.dataframe[2].value.set_index("tokenizer")["estimated_cost"]
+
+    for tokenizer_name in cost_before.index:
+        assert cost_after[tokenizer_name] == pytest.approx(cost_before[tokenizer_name] * 2)
+
+
+def test_benchmark_page_cost_estimator_price_zero_gives_zero_cost():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+    at.number_input[0].set_value(0.0).run(timeout=15)
+
+    assert (at.dataframe[2].value["estimated_cost"] == 0).all()
+
+
+def test_benchmark_page_handles_empty_text_without_error():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+    at.text_area[0].set_value("").run(timeout=15)
+
+    assert not at.exception
+    assert len(at.info) > 0
+
+
+def test_benchmark_page_handles_no_tokenizer_selected():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+    at.multiselect[0].set_value([]).run(timeout=15)
+
+    assert not at.exception
+    assert len(at.info) > 0
+
+
+def test_benchmark_page_offers_the_same_external_options_as_compare():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "4_Benchmark.py"))
+    at.run(timeout=15)
+
+    options = at.multiselect[0].options
+    assert "sentencepiece:unigram" in options
+    assert "huggingface:bert-base-uncased" in options
+    assert "tiktoken:cl100k_base" in options
+
+
+_EXPERIMENT_RESULTS_PATH = (
+    UI_DIR.parent / "data" / "results" / "experiment_results.json"
+)
+
+
+def test_experiments_page_runs_without_error():
+    at = AppTest.from_file(str(UI_DIR / "pages" / "5_Experiments.py"))
+    at.run(timeout=15)
+
+    assert not at.exception
+
+
+def test_experiments_page_shows_precomputed_data_without_recomputing():
+    # This project's real `data/results/experiment_results.json` (Task 6.3)
+    # is committed, so this test verifies the page actually reads and
+    # displays it -- not just that it fails to crash.
+    if not _EXPERIMENT_RESULTS_PATH.exists():
+        pytest.skip("data/results/experiment_results.json not present")
+
+    at = AppTest.from_file(str(UI_DIR / "pages" / "5_Experiments.py"))
+    at.run(timeout=15)
+
+    assert not at.exception
+    assert len(at.dataframe) == 2  # aggregated table + raw results
+    raw_results = at.dataframe[1].value
+    assert "tokenizer" in raw_results.columns
+    assert "language_or_type" in raw_results.columns
+    assert len(raw_results) > 0
+
+
+def test_experiments_page_reports_missing_results_without_fake_data():
+    # The page resolves its results path from its own file location, not
+    # from cwd or an env var, so the only way to exercise the "missing"
+    # branch is to temporarily move the real committed file aside -- always
+    # restored in `finally`, even if the assertions below fail. The page
+    # must report this plainly, never with invented rows to look populated.
+    if not _EXPERIMENT_RESULTS_PATH.exists():
+        pytest.skip("data/results/experiment_results.json not present")
+
+    backup_path = _EXPERIMENT_RESULTS_PATH.with_suffix(".json.bak")
+    _EXPERIMENT_RESULTS_PATH.rename(backup_path)
+    try:
+        at = AppTest.from_file(str(UI_DIR / "pages" / "5_Experiments.py"))
         at.run(timeout=15)
 
-        assert not at.exception, f"{filename} raised an exception"
+        assert not at.exception
+        assert len(at.dataframe) == 0
+        assert len(at.info) > 0
+        assert "run_experiments.py" in at.info[0].value
+    finally:
+        backup_path.rename(_EXPERIMENT_RESULTS_PATH)
+
+
+def test_placeholder_pages_run_without_error():
+    pass  # no remaining placeholder pages -- Benchmark and Experiments are both implemented

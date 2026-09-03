@@ -438,6 +438,22 @@ instead).
   vs. byte-level BPE" in `docs/limitations.md` for the full explanation of
   why `tiktoken` and this project's own `BPETokenizer` are not directly
   comparable algorithms operating on the same units.
+- **`SentencePieceAdapter`** (Task 7.3): wraps `sentencepiece`, Google's
+  Unigram/BPE tokenizer library. Unlike the two adapters above, **`train()`
+  is not a no-op** — it genuinely trains a fresh model (Unigram by
+  default) on whatever corpus is passed to it, entirely in memory via
+  `SentencePieceTrainer.Train(sentence_iterator=..., model_writer=io.BytesIO())`
+  (no temp files), so it can be trained on this project's own datasets for
+  a fair, same-corpus comparison against `BPETokenizer`/`WordPieceTokenizer`.
+  `tokenize()` returns SentencePiece's own pieces unmodified, including its
+  `▁` (U+2581) explicit word-start marker. `save`/`load` use
+  `serialized_model_proto()`, SentencePiece's own binary format — there is
+  no JSON-based serialization to integrate with, the same reasoning as the
+  Hugging Face adapter's native-format `save`/`load`. SentencePiece's
+  trainer *raises* (does not silently cap) if `vocab_size` is too large for
+  the given corpus — real, useful feedback this adapter does not hide. See
+  `docs/unigram_notes.md` (Task 2.6) for why this project wraps Unigram via
+  SentencePiece instead of implementing it from scratch.
 
 ## Token frequency analysis (`src/vocabulary/frequency_analysis.py`, Task 4.3)
 
@@ -538,28 +554,56 @@ or comparison logic lives in `ui/`.
 - **`tokenizers/registry.py`**: `AVAILABLE_TOKENIZERS` / `create_tokenizer(name)`
   — the single list of tokenizers the UI offers, so it is not hardcoded in
   more than one page.
+- **`ui/tokenizer_options.py`**: tokenizer-selection helpers shared by
+  Compare and Benchmark (below), so neither page duplicates the "which
+  tokenizers can a user pick, and how do I build one without letting a
+  single failure discard every other result" logic. Three sources: this
+  project's own (`AVAILABLE_TOKENIZERS`, trained live), a pretrained
+  external one (Hugging Face/tiktoken, Task 7.1/7.2 — loaded once and
+  cached via `@st.cache_resource`, including *failures*, for
+  `EXTERNAL_TOKENIZER_RETRY_SECONDS` = 5 minutes, so an offline
+  environment doesn't retry the network on every rerun), and a trainable
+  external one (SentencePiece, Task 7.3 — trained live like this
+  project's own tokenizers, at a smaller UI-specific `vocab_size` than the
+  adapter's own default, since a live demo's input is often just a
+  sentence or two).
 - **Tokenize** (`1_Tokenize.py`, Task 8.2): text in, colored tokens + a
   token→ID table out. To work for *any* input without pretraining on a
   large corpus, the selected tokenizer is trained live on the text the
   user enters — this is a deliberate demo simplification (documented on
   the page itself), not a hidden default.
-- **Compare** (`2_Compare.py`, Task 8.3): the same idea, but for several
-  tokenizers (multi-select) on one shared input text, displayed as a
-  metrics table (via the Comparator) plus each tokenizer's token list.
-  Always shows the fair-comparison disclaimer (referencing
-  `docs/benchmarking_methodology.md`, Task 7.4) and `vocab_size`. Besides
-  this project's own trainable tokenizers, the two external adapters
-  (Task 7.1/7.2) are offered as additional, opt-in selections — not
-  selected by default, since loading a real pretrained tokenizer can need
-  network access on first use; `@st.cache_resource` avoids reloading one
-  on every rerun once selected. Passed to `compare_tokenizers` exactly like
-  any other `Tokenizer`, with no Comparator changes.
+- **Compare** (`2_Compare.py`, Task 8.3): several tokenizers (multi-select)
+  on one shared input text, displayed as a metrics table (via the
+  Comparator) plus each tokenizer's token list. Always shows the
+  fair-comparison disclaimer (referencing `docs/benchmarking_methodology.md`,
+  Task 7.4) and `vocab_size`. External tokenizers (`ui/tokenizer_options.py`)
+  are opt-in, not selected by default. Passed to `compare_tokenizers`
+  exactly like any other `Tokenizer`, with no Comparator changes.
 - **Vocabulary** (`3_Vocabulary.py`, Task 8.4): selects one of this
   project's own tokenizers, trains it live on an entered corpus (the same
   text doubles as the corpus `vocabulary.frequency_analysis` counts over),
   and shows vocabulary size, a top-N frequent-token bar chart, and a rare-
   token table — all computed by Task 4.3's functions, never recomputed
   here.
+- **Benchmark** (`4_Benchmark.py`, Task 8.5): the same live/interactive
+  idea as Compare, plus two things Compare does not show: encode/decode
+  timing per tokenizer (`benchmarking.timer.measure_tokenizer_timing`,
+  Task 5.2) and a generic tokenization cost estimator (Task 8.7) —
+  `estimated_cost = (num_tokens / 1_000_000) * price_per_million`, with
+  `price_per_million` a plain `st.number_input` the user sets themselves
+  (never a hardcoded real provider price). Reuses `ui/tokenizer_options.py`,
+  so tokenizer selection/construction is not duplicated between Compare
+  and Benchmark.
+- **Experiments** (`5_Experiments.py`, Task 8.5): the opposite of
+  live — loads `data/results/experiment_results.json` (written by
+  `scripts/run_experiments.py`, Task 6.3) via
+  `benchmarking.export.load_results_json` and aggregates it with the
+  existing Task 6.4 functions (`experiments.aggregation`); it never trains
+  or runs a tokenizer itself. Shows compression-ratio-per-language/type
+  and tokens-per-word-per-type bar charts, the aggregated table,
+  `describe_observations`'s dataset-scoped sentences, and the raw rows. If
+  the results file does not exist yet, it says so plainly (with the
+  command to generate it) instead of inventing rows.
 - **How LLMs Use Tokens** (`6_How_LLMs_Use_Tokens.py`, Task 8.6): a purely
   illustrative walk through `Text -> Tokens -> Token IDs -> Embedding
   lookup -> Vectors -> Model`. Only the first three steps use real
@@ -567,7 +611,6 @@ or comparison logic lives in `ui/`.
   vectors seeded by token ID (fixed per token ID, not real learned
   parameters), and the page never claims or implements a next-token
   prediction — everything past "Token IDs" is labeled illustrative.
-- **Benchmark**, **Experiments**: placeholder pages for later phases.
 
 Pages are tested with `streamlit.testing.v1.AppTest`
 (`tests/test_ui_pages.py`), which actually executes each page script

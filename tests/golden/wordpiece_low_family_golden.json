@@ -1,0 +1,33 @@
+{
+  "description": "Golden outputs for WordPieceTokenizer trained on the classic low/lower/lowest corpus (Task 9.3). If this file's expected values ever change, that must be a deliberate, reviewed decision after confirming the new behavior is correct -- not a silent side effect of a refactor.",
+  "tokenizer": "wordpiece",
+  "training_corpus": ["low", "low", "low", "low", "low", "lower", "lower", "lowest"],
+  "vocab_size": 15,
+  "cases": [
+    {
+      "input": "low",
+      "expected_tokens": ["low"],
+      "expected_ids": [17]
+    },
+    {
+      "input": "lower",
+      "expected_tokens": ["lower"],
+      "expected_ids": [18]
+    },
+    {
+      "input": "lowest",
+      "expected_tokens": ["low", "##est"],
+      "expected_ids": [17, 13]
+    },
+    {
+      "input": "lowering",
+      "expected_tokens": ["<UNK>"],
+      "expected_ids": [1]
+    },
+    {
+      "input": "newword",
+      "expected_tokens": ["<UNK>"],
+      "expected_ids": [1]
+    }
+  ]
+}

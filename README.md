@@ -45,18 +45,21 @@ streamlit run ui/streamlit_app.py
 
 Implemented so far: project foundations, the abstract `Tokenizer` contract, the
 central `Vocabulary`/special-tokens manager and generalized serialization, the
-character-level, word-level, BPE, and WordPiece tokenizers, two external
-adapters (Hugging Face `tokenizers`, `tiktoken`), benchmarking (metrics, an
-encode/decode Timer, a tokenizer Comparator, CSV/JSON export), vocabulary
-frequency analysis, a Streamlit dashboard (Tokenize, Compare, Vocabulary, and
-"How LLMs Use Tokens" pages; Benchmark/Experiments are placeholders), and the
-Phase 6 dataset pipeline: 9 raw-text categories in `data/raw/`, a loader with
-mandatory Unicode NFC normalization, an Experiment Runner over the full
-Tokenizer x Dataset matrix, and result aggregation
+character-level, word-level, BPE, and WordPiece tokenizers, three external
+adapters (Hugging Face `tokenizers`, `tiktoken`, `sentencepiece`), benchmarking
+(metrics, an encode/decode Timer, a tokenizer Comparator, CSV/JSON export),
+vocabulary frequency analysis, a full Streamlit dashboard (Tokenize, Compare,
+Vocabulary, Benchmark — with encode/decode timing and a generic cost
+estimator, Experiments — pre-computed results only, and "How LLMs Use
+Tokens"), and the Phase 6 dataset pipeline: 9 raw-text categories in
+`data/raw/`, a loader with mandatory Unicode NFC normalization, an Experiment
+Runner over the full Tokenizer x Dataset matrix, and result aggregation
 (`scripts/run_experiments.py`, `docs/experiment_results.md`). The BPE
 implementation is the classical **character-level BPE with a `</w>`
 word-boundary marker** (Sennrich et al., 2015) — not the byte-level BPE used
-by GPT-style models/`tiktoken`; see
+by GPT-style models/`tiktoken`; the Unigram algorithm SentencePiece can train
+is not implemented from scratch, only wrapped (see
+[docs/unigram_notes.md](docs/unigram_notes.md)). See
 [docs/architecture.md](docs/architecture.md),
 [docs/limitations.md](docs/limitations.md), and
 [docs/benchmarking_methodology.md](docs/benchmarking_methodology.md) for why

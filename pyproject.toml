@@ -10,6 +10,14 @@ license = { text = "MIT" }
 testpaths = ["tests"]
 pythonpath = ["src"]
 
+[tool.coverage.run]
+# Scope to this project's own code. Without this, `--cov=tokenizers` also
+# picks up the *pip-installed* `tokenizers` library (imported deliberately
+# inside `tokenizers.adapters.huggingface_tokenizer`'s sys.path workaround,
+# see that module's docstring) purely because it shares a top-level import
+# name with this project's own `src/tokenizers` package.
+source = ["src"]
+
 [tool.ruff]
 line-length = 100
 target-version = "py311"

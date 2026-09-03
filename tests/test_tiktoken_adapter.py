@@ -34,6 +34,15 @@ def test_explicit_name_overrides_the_default():
     assert adapter.name == "custom-name"
 
 
+def test_for_model_loads_whichever_encoding_that_model_uses():
+    adapter = TiktokenAdapter.for_model("gpt-4")
+
+    assert adapter.name == f"tiktoken:{tiktoken.encoding_for_model('gpt-4').name}"
+    assert adapter.encode("hello world") == tiktoken.encoding_for_model("gpt-4").encode(
+        "hello world"
+    )
+
+
 def test_train_is_a_no_op_and_does_not_raise():
     adapter = _adapter()
     ids_before = adapter.encode("hello world")

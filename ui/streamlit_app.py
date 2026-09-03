@@ -19,7 +19,10 @@ st.write(
     "on the same text, side by side.\n"
     "- **Vocabulary** — inspect a trained tokenizer's vocabulary size, "
     "most-frequent tokens, and rare tokens.\n"
+    "- **Benchmark** — live comparison plus encode/decode timing and a "
+    "generic tokenization cost estimator.\n"
+    "- **Experiments** — pre-computed results from this project's own "
+    "fixed datasets, never recalculated live.\n"
     "- **How LLMs Use Tokens** — a purely illustrative walk through "
-    "text → tokens → token IDs → (illustrative) embeddings.\n"
-    "- **Benchmark**, **Experiments** — placeholders for later phases."
+    "text → tokens → token IDs → (illustrative) embeddings."
 )

@@ -1,7 +1,8 @@
 """Unit tests for `WordPieceTokenizer` (Phase 3, Task 3.1/3.3/3.4/3.5)."""
 
-from tokenizers.wordpiece.tokenizer import WordPieceTokenizer
+from tokenizers.wordpiece.tokenizer import WordPieceTokenizer, _greedy_longest_match
 from vocabulary.special_tokens import ORDERED_SPECIAL_TOKENS, UNK
+from vocabulary.vocab import Vocabulary
 
 _LOW_FAMILY_CORPUS = ["low"] * 5 + ["lower"] * 2 + ["lowest"]
 
@@ -56,6 +57,14 @@ def test_train_is_deterministic():
 # ---------------------------------------------------------------------------
 # Task 3.4 — greedy longest-match encode
 # ---------------------------------------------------------------------------
+
+
+def test_greedy_longest_match_of_an_empty_word_is_an_empty_list():
+    # Defensive branch: `WordTokenizer.tokenize` (the only real caller)
+    # never produces an empty-string "word", but `_greedy_longest_match`
+    # is tested directly here since an empty word is still a valid input
+    # to guard against.
+    assert _greedy_longest_match("", Vocabulary()) == []
 
 
 def test_tokenize_picks_the_longest_available_match_not_the_first_one():
