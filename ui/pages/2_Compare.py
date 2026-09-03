@@ -29,12 +29,14 @@ sys.path.insert(0, str(_UI_DIR.parent / "src"))
 sys.path.insert(0, str(_UI_DIR))
 
 import streamlit as st  # noqa: E402
+from theme import inject_theme, render_token_pills  # noqa: E402
 from tokenizer_options import all_tokenizer_names, build_tokenizers  # noqa: E402
 
 from benchmarking.comparator import compare_tokenizers  # noqa: E402
 from tokenizers.registry import AVAILABLE_TOKENIZERS  # noqa: E402
 
 st.set_page_config(page_title="Compare", page_icon="⚖️")
+inject_theme()
 st.title("Compare")
 
 st.warning(
@@ -92,4 +94,10 @@ else:
             st.subheader("Tokens")
             for row in results.itertuples():
                 st.markdown(f"**{row.tokenizer}** (vocab size: {row.vocab_size})")
-                st.write(row.tokens if row.tokens else "_(no tokens)_")
+                if row.tokens:
+                    st.markdown(
+                        render_token_pills(list(row.tokens), row.tokenizer),
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    st.write("_(no tokens)_")

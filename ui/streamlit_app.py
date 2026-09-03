@@ -8,9 +8,16 @@ none of them re-implement tokenization, metrics, or comparison.
 
 from __future__ import annotations
 
-import streamlit as st
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+import streamlit as st  # noqa: E402
+from theme import inject_theme  # noqa: E402
 
 st.set_page_config(page_title="LLM Tokenization Lab", page_icon="🧩")
+inject_theme()
 st.title("LLM Tokenization & Vocabulary Analysis Platform")
 st.write(
     "Use the sidebar to navigate.\n\n"

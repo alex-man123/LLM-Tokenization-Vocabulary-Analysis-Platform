@@ -1334,6 +1334,112 @@ Pentru orice text și tokenizer selectat, costul estimat se recalculează corect
 
 ---
 
+---
+
+## Task 8.8 — Identitate Vizuală Custom (CSS Theme)
+
+Objective: Stil vizual coerent, distinct de temele default Streamlit.
+
+What to implement:
+
+ui/theme.css sau st.markdown("<style>...</style>", unsafe_allow_html=True) în streamlit_app.py, care:
+importă un font monospace (JetBrains Mono sau Fira Code) din Google Fonts, aplicat pe orice element ce afișează tokeni/cod;
+stilizează pill-urile de tokeni (border-radius, padding, tranziție de hover) folosind culorile din TOKENIZER_COLORS (Task 8.9), nu culori hardcodate separat — dacă schimbi o culoare, o schimbi într-un singur loc;
+definește 2-3 variabile CSS de accent (nu doar dark background generic), consistente pe toate paginile.
+
+Dependencies: 8.9 (culorile trebuie să existe înainte să le injectezi în CSS).
+
+Priority: SHOULD HAVE
+
+Difficulty: Easy
+
+Definition of Done: Pill-urile de tokeni din Tokenize/Compare folosesc culoarea specifică tokenizer-ului din dicționarul central, nu roșu uniform; fontul monospace apare pe toate afișările de tokeni/cod.
+
+## Task 8.9 — Culoare Consistentă per Tokenizer (implementezi primul)
+
+Objective: Un singur punct de adevăr pentru culoarea fiecărui tokenizer, reutilizat de toate componentele vizuale ulterioare (CSS, Plotly).
+
+What to implement:
+
+Un dicționar Python centralizat, ex. ui/theme.py:
+python
+TOKENIZER_COLORS = {
+    "bpe": "#4F9DDE",
+    "character": "#F2994A",
+    "word": "#27AE60",
+    "wordpiece": "#BB6BD9",
+    "huggingface": "#EB5757",
+    "tiktoken": "#F2C94C",
+    "sentencepiece": "#56CCF2",
+}
+Culoare de fallback pentru orice tokenizer nou/necunoscut (nu crapă dacă apare un name neînregistrat).
+Import-abil atât din codul CSS (Task 8.8, valorile injectate ca variabile), cât și din codul Plotly (Task 8.10, ca color_discrete_map).
+
+Dependencies: Niciuna (e fundația celorlalte).
+
+Priority: NICE TO HAVE (dar prioritizat primul dintre task-urile de polish).
+
+Difficulty: Easy
+
+Definition of Done: Aceeași culoare pentru bpe apare identic în Tokenize, Compare și Experiments — verificat vizual pe toate cele 3 pagini simultan.
+
+## Task 8.10 — Grafice Plotly Interactive
+
+Objective: Grafice interactive (hover, zoom) în Vocabulary și Experiments, în locul bar chart-urilor statice.
+
+What to implement:
+
+Înlocuiește graficele curente (Matplotlib/st.bar_chart) cu plotly.express sau plotly.graph_objects în paginile Vocabulary (top-N frecvențe) și Experiments (compression ratio per limbă, tokens/word per tip).
+Folosește color_discrete_map=TOKENIZER_COLORS (Task 8.9) pentru legendă consistentă cu restul aplicației.
+
+⚠️ Dependency explicită, nu implicită: adaugă plotly ca dependență nouă în pyproject.toml, cu justificare scrisă în Technology Stack (secțiunea din documentul principal): "Plotly — interactivitate (hover cu valori exacte, zoom/pan) pe grafice cu multe categorii (9 dataset-uri în Experiments); cost: o singură librărie nouă, reutilizată și de Task 8.12." Nu presupune că e deja disponibilă — verifică și documentează explicit adăugarea.
+
+Dependencies: 8.9 (pentru color mapping).
+
+Priority: SHOULD HAVE
+
+Difficulty: Easy-Medium
+
+Definition of Done: Graficele din Vocabulary și Experiments sunt Plotly, cu hover funcțional, culori consistente cu Task 8.9, și plotly apare explicit în pyproject.toml.
+
+## Task 8.11 — Animație Pas-cu-Pas a Merge-urilor BPE
+
+Objective: Vizualizare didactică a training loop-ului BPE (Task 2.2), pas cu pas.
+
+What to implement:
+
+O componentă nouă (poate în Tokenize sau o secțiune separată) cu un slider "Merge step: X / N".
+Pentru fiecare pas: afișează reprezentarea corpusului înainte de merge, perechea aleasă (evidențiată vizual), și corpusul după merge.
+Reutilizează direct lista de merge-uri salvată de trainer-ul BPE (Task 2.3) — nu reimplementa training-ul separat pentru vizualizare.
+
+Dependencies: 2.2, 2.3 (lista de merge-uri trebuie să existe deja, salvată/accesibilă).
+
+Priority: NICE TO HAVE
+
+Difficulty: Medium
+
+Definition of Done: Mutând slider-ul, corpusul afișat se actualizează corect la fiecare pas, cu perechea de merge evidențiată clar.
+
+## Task 8.12 — 3D Embeddings Scatter (ultimul, cel mai opțional)
+
+Objective: Singura componentă "3D" din aplicație, în pagina "How LLMs Use Tokens" (Task 8.6), plasată acolo pentru relevanță conceptuală, nu decorativ.
+
+What to implement:
+
+Vectori ilustrativi generați cu numpy.random (dimensiune mică, ex. 8-16), pentru un set fix de tokeni din vocabularul curent antrenat.
+Reducere la 3 dimensiuni prin PCA (implementabil cu NumPy pur — numpy.linalg.svd sau echivalent — fără librărie nouă suplimentară pentru asta).
+Afișare cu plotly.graph_objects.Scatter3d (deja disponibil din Task 8.10), interactiv (rotire cu mouse-ul).
+
+⚠️ Restricție explicită de scop, nu opțională: NU descărca și NU folosi embeddings reale (GloVe, word2vec) — ar contrazice decizia de scop din Technology Stack ("nu antrenăm rețele neuronale, nu avem nevoie de embeddings antrenate") și ar adăuga o dependență disproporționată (fișiere de sute de MB) față de restul proiectului. Vectorii rămân explicit etichetați "ilustrativ, nu antrenat", consistent cu Task 8.6.
+
+Dependencies: 8.6, 8.10 (Plotly deja adăugat).
+
+Priority: NICE TO HAVE
+
+Difficulty: Medium
+
+Definition of Done: Scatter 3D interactiv funcțional, cu tokeni etichetați, vectori generați local (nu descărcați), fără dependențe noi în afară de Plotly (deja justificat la 8.10).
+
 # Testing Strategy
 
 ## Task 9.1 — Unit Tests Completare & Coverage
@@ -1518,6 +1624,11 @@ Cu acest MVP poți deja demonstra: "am implementat BPE de la zero, am un dashboa
 47. Task 10.2 — Documentație BPE & WordPiece (include disclaimer WordPiece simplificat)
 48. Task 10.3 — Metodologie Benchmarking + Rezultate + Limitări
 49. Task 0.4 — Lint & CI (oricând, opțional, nu blocant)
+50. Task 8.9 (dicționar TOKENIZER_COLORS) — construiește-l primul, e folosit de 8.8, 8.10
+51. Task 8.8 - folosește culorile din 8.9 pentru pill-uri
+52. Task 8.10 (Plotly) — reutilizează TOKENIZER_COLORS pentru barele/liniile din grafice
+53. Task 8.11 (animație BPE) — independent, poate veni oricând
+54. Task 8.12 (3D scatter) — ultimul, cel mai opțional, folosește Plotly deja adăugat la pasul 3
 ```
 
 ---

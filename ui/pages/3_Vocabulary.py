@@ -16,9 +16,13 @@ from pathlib import Path
 
 # Streamlit runs each page as an independent script, so every page must set
 # this up itself rather than relying on streamlit_app.py having run first.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+_UI_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_UI_DIR.parent / "src"))
+sys.path.insert(0, str(_UI_DIR))
 
+import plotly.express as px  # noqa: E402
 import streamlit as st  # noqa: E402
+from theme import get_tokenizer_color, inject_theme  # noqa: E402
 
 from tokenizers.registry import AVAILABLE_TOKENIZERS, create_tokenizer  # noqa: E402
 from vocabulary.frequency_analysis import (  # noqa: E402
@@ -29,6 +33,7 @@ from vocabulary.frequency_analysis import (  # noqa: E402
 )
 
 st.set_page_config(page_title="Vocabulary", page_icon="📖")
+inject_theme()
 st.title("Vocabulary")
 st.caption(
     "This demo trains the selected tokenizer live on the text you enter, then "
@@ -78,9 +83,17 @@ else:
                     value=min(10, len(frequencies)),
                 )
             top_entries = top_n_frequent_tokens(frequencies, top_n)
-            top_df = to_dataframe(top_entries).set_index("token")
-            st.bar_chart(top_df["frequency"])
-            st.dataframe(to_dataframe(top_entries), width="stretch")
+            top_df = to_dataframe(top_entries)
+            fig = px.bar(
+                top_df,
+                x="token",
+                y="frequency",
+                color_discrete_sequence=[get_tokenizer_color(tokenizer_name)],
+                labels={"token": "Token", "frequency": "Frequency"},
+            )
+            fig.update_layout(showlegend=False, margin={"l": 0, "r": 0, "t": 10, "b": 0})
+            st.plotly_chart(fig, width="stretch")
+            st.dataframe(top_df, width="stretch")
 
             st.caption(
                 "Natural-language token frequencies are approximately **Zipfian**: a "

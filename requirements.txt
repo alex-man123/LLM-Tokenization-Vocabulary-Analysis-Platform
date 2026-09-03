@@ -1,6 +1,13 @@
 # Runtime dependencies, added as each phase actually starts using them.
+numpy>=1.26   # Phase 8: illustrative embeddings + pure-NumPy PCA for the 3D
+              # scatter (Task 8.12) -- directly imported now, previously only
+              # a transitive dependency of pandas.
 pandas>=2.0   # Phase 5: Comparator (Task 5.3) returns a pandas DataFrame.
 streamlit>=1.30   # Phase 8: Streamlit UI (Task 8.1+).
 tokenizers>=0.20   # Phase 7: Hugging Face `tokenizers` adapter (Task 7.1).
 tiktoken>=0.7   # Phase 7: tiktoken adapter (Task 7.2).
 sentencepiece>=0.2   # Phase 7: SentencePiece adapter (Task 7.3).
+plotly>=5.20   # Phase 8: interactive Vocabulary/Experiments charts, and the 3D
+               # embeddings scatter (Task 8.10/8.12) -- hover with exact values
+               # and zoom/pan, useful across the 9 dataset categories shown in
+               # Experiments.

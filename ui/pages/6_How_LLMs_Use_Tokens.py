@@ -20,10 +20,19 @@ from pathlib import Path
 
 # Streamlit runs each page as an independent script, so every page must set
 # this up itself rather than relying on streamlit_app.py having run first.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+_UI_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_UI_DIR.parent / "src"))
+sys.path.insert(0, str(_UI_DIR))
 
 import pandas as pd  # noqa: E402
+import plotly.graph_objects as go  # noqa: E402
 import streamlit as st  # noqa: E402
+from embeddings_3d import (  # noqa: E402
+    DEFAULT_EMBEDDING_DIMENSIONS,
+    generate_illustrative_embeddings,
+    pca_3d,
+)
+from theme import inject_theme  # noqa: E402
 
 from tokenizers.registry import AVAILABLE_TOKENIZERS, create_tokenizer  # noqa: E402
 
@@ -74,6 +83,7 @@ def _illustrative_embedding(token_id: int, dimensions: int = _EMBEDDING_DIMENSIO
 
 
 st.set_page_config(page_title="How LLMs Use Tokens", page_icon="🧠")
+inject_theme()
 st.title("How LLMs Use Tokens")
 
 st.write(
@@ -137,3 +147,41 @@ else:
                 "through its layers to predict the next token's ID. This page "
                 "stops here — no model is implemented or simulated."
             )
+
+            st.subheader("4. Illustrative 3D embedding space")
+            st.warning(
+                "Illustrative embeddings — randomly generated and not trained on "
+                "language data. Token IDs → embeddings → vectors → this 3D plot; the "
+                "distances between points say nothing about real semantic "
+                "relationships between tokens."
+            )
+            st.caption(
+                f"{DEFAULT_EMBEDDING_DIMENSIONS}-dimensional random vectors, one per "
+                "distinct token ID above, reduced to 3 dimensions with a plain NumPy "
+                "PCA (via SVD) purely so they can be plotted here."
+            )
+            unique_ids = sorted(set(token_ids))
+            id_to_token = dict(zip(token_ids, tokens, strict=True))
+            vectors = generate_illustrative_embeddings(unique_ids)
+            coords = pca_3d(vectors)
+            labels = [id_to_token[token_id] for token_id in unique_ids]
+            scatter = go.Figure(
+                data=[
+                    go.Scatter3d(
+                        x=coords[:, 0],
+                        y=coords[:, 1],
+                        z=coords[:, 2],
+                        mode="markers+text",
+                        text=labels,
+                        textposition="top center",
+                        customdata=unique_ids,
+                        marker={"size": 6, "color": coords[:, 0], "colorscale": "Viridis"},
+                        hovertemplate=(
+                            "token=%{text}<br>token_id=%{customdata}<br>"
+                            "x=%{x:.3f}<br>y=%{y:.3f}<br>z=%{z:.3f}<extra></extra>"
+                        ),
+                    )
+                ]
+            )
+            scatter.update_layout(margin={"l": 0, "r": 0, "t": 10, "b": 0}, height=500)
+            st.plotly_chart(scatter, width="stretch")

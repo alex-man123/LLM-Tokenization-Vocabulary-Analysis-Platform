@@ -2,38 +2,33 @@
 
 Thin UI only — no tokenization logic here. Everything comes from
 `tokenizers.registry` and the selected tokenizer's own public API
-(`train`, `tokenize`, `encode`).
+(`train`, `tokenize`, `encode`). Token pill colors (Task 8.9/8.8) and the
+BPE merge-by-merge walkthrough (Task 8.11) reuse existing central
+modules (`ui/theme.py`, `tokenizers/bpe/visualization.py`) rather than
+duplicating either concern here.
 """
 
 from __future__ import annotations
 
-import html
 import sys
 from pathlib import Path
 
 # Streamlit runs each page as an independent script, so every page must set
 # this up itself rather than relying on streamlit_app.py having run first.
-sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+_UI_DIR = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(_UI_DIR.parent / "src"))
+sys.path.insert(0, str(_UI_DIR))
 
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
+from theme import inject_theme, render_token_pills  # noqa: E402
 
+from tokenizers.bpe.tokenizer import BPETokenizer  # noqa: E402
+from tokenizers.bpe.visualization import compute_merge_steps, format_word_freqs  # noqa: E402
 from tokenizers.registry import AVAILABLE_TOKENIZERS, create_tokenizer  # noqa: E402
 
-_PALETTE = [
-    "#e6194b",
-    "#3cb44b",
-    "#f0c419",
-    "#4363d8",
-    "#f58231",
-    "#911eb4",
-    "#46b8b8",
-    "#e83e8c",
-    "#8bc34a",
-    "#7986cb",
-]
-
 st.set_page_config(page_title="Tokenize", page_icon="🔤")
+inject_theme()
 st.title("Tokenize")
 st.caption(
     "This demo trains the selected tokenizer live on the text you enter, so it "
@@ -59,14 +54,7 @@ else:
             st.info("This input produced no tokens.")
         else:
             st.subheader("Tokens")
-            spans = "".join(
-                f'<span style="background:{_PALETTE[i % len(_PALETTE)]};'
-                f"color:#000;padding:2px 6px;margin:2px;border-radius:4px;"
-                f'display:inline-block;font-family:monospace;">'
-                f"{html.escape(token)}</span>"
-                for i, token in enumerate(tokens)
-            )
-            st.markdown(spans, unsafe_allow_html=True)
+            st.markdown(render_token_pills(tokens, tokenizer_name), unsafe_allow_html=True)
 
             st.subheader("Token IDs")
             st.dataframe(
@@ -74,3 +62,31 @@ else:
                 width="stretch",
             )
             st.caption(f"Vocabulary size: {tokenizer.vocab_size}")
+
+            if isinstance(tokenizer, BPETokenizer) and tokenizer.merges:
+                with st.expander("BPE Merge Visualization"):
+                    st.caption(
+                        "Replays this tokenizer's own learned merges, in order, over the "
+                        "text above — the same `apply_merge` function training itself "
+                        "uses, not a second implementation of BPE."
+                    )
+                    merges = list(tokenizer.merges)
+                    steps = compute_merge_steps([text], merges)
+                    if len(steps) == 1:
+                        step_index = 1
+                    else:
+                        step_index = st.slider(
+                            "Merge step", min_value=1, max_value=len(steps), value=1
+                        )
+                    step = steps[step_index - 1]
+                    st.markdown(
+                        f"**Step {step.step} / {len(steps)} — selected pair:** "
+                        f"`{step.pair[0]}` + `{step.pair[1]}` → `{step.pair[0]}{step.pair[1]}`"
+                    )
+                    before_col, after_col = st.columns(2)
+                    with before_col:
+                        st.markdown("**Corpus before merge**")
+                        st.code("\n".join(format_word_freqs(step.before)), language=None)
+                    with after_col:
+                        st.markdown("**Corpus after merge**")
+                        st.code("\n".join(format_word_freqs(step.after)), language=None)

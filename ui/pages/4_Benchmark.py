@@ -31,6 +31,7 @@ sys.path.insert(0, str(_UI_DIR))
 
 import pandas as pd  # noqa: E402
 import streamlit as st  # noqa: E402
+from theme import inject_theme  # noqa: E402
 from tokenizer_options import all_tokenizer_names, build_tokenizers  # noqa: E402
 
 from benchmarking.comparator import compare_tokenizers  # noqa: E402
@@ -40,6 +41,7 @@ from tokenizers.registry import AVAILABLE_TOKENIZERS  # noqa: E402
 _TIMING_ITERATIONS = 5
 
 st.set_page_config(page_title="Benchmark", page_icon="📊")
+inject_theme()
 st.title("Benchmark")
 st.caption(
     "Live benchmark: pick tokenizers, enter text, and see metrics, timing, and "

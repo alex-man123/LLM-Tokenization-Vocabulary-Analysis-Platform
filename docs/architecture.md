@@ -615,3 +615,46 @@ or comparison logic lives in `ui/`.
 Pages are tested with `streamlit.testing.v1.AppTest`
 (`tests/test_ui_pages.py`), which actually executes each page script
 (including simulated widget input), not just imports it.
+
+### Visual identity & interactive charts (Phase 8 polish, Tasks 8.8-8.12)
+
+- **`ui/theme.py`** (Task 8.9/8.8): the single source of truth for every
+  tokenizer's accent color (`TOKENIZER_COLORS`, keyed by the short family
+  name before a `":"`, e.g. `"tiktoken"` for `"tiktoken:cl100k_base"`) and
+  for the CSS injected once per page (`inject_theme()` — a monospace font
+  for tokens/IDs/code, token-pill styling, and a small set of `--accent-*`
+  CSS variables). `get_tokenizer_color`/`color_map_for` fall back to
+  `TOKENIZER_FALLBACK_COLOR` for any name not in the dict, so an
+  unrecognized tokenizer never crashes a page. Every component that colors
+  something by tokenizer (Tokenize/Compare's `render_token_pills`, the
+  Plotly charts below) reads through this module — no page hardcodes a
+  color of its own.
+- **Plotly charts** (Task 8.10): Vocabulary's top-N frequency chart and
+  Experiments' two charts (compression ratio per language/type; tokens per
+  word per language/type by tokenizer) use `plotly.express` instead of
+  `st.bar_chart`, for hover-with-exact-values and zoom/pan across
+  Experiments' 9 dataset categories. Neither page recomputes or reshapes
+  data for this — they consume the same `frequency_analysis`/
+  `experiments.aggregation` output as before, just charted differently.
+  The by-tokenizer chart's colors come from `theme.color_map_for`, so
+  `bpe`'s bars are the same color here as `bpe`'s token pills on
+  Tokenize/Compare.
+- **BPE merge visualization** (Task 8.11, `tokenizers/bpe/visualization.py`):
+  `compute_merge_steps(corpus, merges)` replays an already-trained
+  `BPETokenizer`'s own ordered `merges` list over `build_word_frequencies`'
+  output, one `apply_merge` call per step — both functions are the
+  trainer's own (Task 2.1/2.2), so this never re-selects a pair or
+  reimplements training. The Tokenize page's "BPE Merge Visualization"
+  expander (shown only when the selected tokenizer is BPE and learned at
+  least one merge) uses a slider over these steps to show the corpus
+  immediately before/after each learned merge.
+- **Illustrative 3D embeddings** (Task 8.12, `ui/embeddings_3d.py`): a
+  second, separate illustrative-embedding path from Task 8.6's own
+  `_illustrative_embedding` (which powers that page's 2D table) —
+  `generate_illustrative_embeddings` produces one fixed,
+  `numpy.random.default_rng(seed=token_id)`-seeded 12-dimensional vector
+  per distinct token ID, and `pca_3d` reduces those to 3 dimensions with a
+  plain NumPy SVD (no `scikit-learn`). Plotted with
+  `plotly.graph_objects.Scatter3d` on the "How LLMs Use Tokens" page,
+  clearly labeled as illustrative — not a trained model's embeddings, and
+  not GloVe/word2vec.
