@@ -61,6 +61,25 @@ by GPT-style models/`tiktoken`; the Unigram algorithm SentencePiece can train
 is not implemented from scratch, only wrapped (see
 [docs/unigram_notes.md](docs/unigram_notes.md)). See
 [docs/architecture.md](docs/architecture.md),
+[docs/bpe_explained.md](docs/bpe_explained.md),
+[docs/wordpiece_explained.md](docs/wordpiece_explained.md),
 [docs/limitations.md](docs/limitations.md), and
 [docs/benchmarking_methodology.md](docs/benchmarking_methodology.md) for why
 that distinction (and fair-comparison methodology in general) matters.
+
+## Documentation
+
+- [docs/architecture.md](docs/architecture.md) — data conventions, module
+  layout, and the experiment result schema.
+- [docs/bpe_explained.md](docs/bpe_explained.md) /
+  [docs/wordpiece_explained.md](docs/wordpiece_explained.md) — how the two
+  from-scratch algorithms work, with a worked example and a comparison
+  table.
+- [docs/unigram_notes.md](docs/unigram_notes.md) — why Unigram is wrapped
+  via SentencePiece rather than implemented from scratch.
+- [docs/benchmarking_methodology.md](docs/benchmarking_methodology.md) —
+  how to compare tokenizers without drawing unsupported conclusions.
+- [docs/experiment_results.md](docs/experiment_results.md) — real,
+  generated results from the Phase 6 experiment pipeline.
+- [docs/limitations.md](docs/limitations.md) — known scope limits, read
+  this before citing this project's numbers anywhere.
